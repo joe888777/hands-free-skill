@@ -180,6 +180,72 @@ Hands-Free Session Log (full, learning: high)
   [finishing-branch] PAUSED — git push → user approved
 ```
 
+## Ralph Loop Integration
+
+Hands-free is designed to work with ralph-loop (`/ralph-loop`) and superpowers together. When a ralph-loop is active (`.claude/.ralph-loop.local.md` exists), hands-free enters **loop-aware mode** automatically.
+
+### Detecting Loop Mode
+
+Check for `.claude/.ralph-loop.local.md` at the start of each iteration. If present, hands-free is loop-aware.
+
+### Loop-Aware Behavior
+
+**Skip repeated brainstorming.** If the current iteration's task matches the previous iteration (same prompt), do NOT re-brainstorm from scratch. Instead:
+- Iteration 1: Full brainstorming → pick recommended → design → plan
+- Iteration 2+: Read previous work from files/git → continue where left off or improve
+
+**Auto-detect iteration phase.** Each iteration, assess what state the work is in:
+1. No prior work → start fresh with superpowers brainstorming
+2. Partial implementation → continue executing the existing plan
+3. Tests failing → enter systematic-debugging
+4. Tests passing, work incomplete → continue to next plan step
+5. All work complete → output the completion promise
+
+**Iteration-aware auto-commits.** When auto-commit is on, tag commits with the iteration number:
+```
+[ralph #3] feat: add input validation to user form
+[ralph #3] fix: handle edge case in date parser
+[ralph #4] test: add missing integration tests
+```
+
+Read the iteration count from `.claude/.ralph-loop.local.md` state file.
+
+### Superpowers Skill Routing in Loop Mode
+
+| Iteration State | Superpowers Skill | Hands-Free Action |
+|---|---|---|
+| No prior work | brainstorming → writing-plans | Auto-accept all, full flow |
+| Plan exists, not started | executing-plans | Auto-continue batches |
+| Plan in progress | executing-plans | Resume from last batch |
+| Tests failing | systematic-debugging | Auto-proceed through phases |
+| Implementation done | verification-before-completion | Auto-verify |
+| All complete | finishing-a-development-branch | PAUSE for push/merge |
+
+### Quick Start
+
+```
+/hands-free full
+/hands-free auto-commit on
+/hands-free learning high
+/ralph-loop "Build feature X. Output <promise>DONE</promise> when all tests pass." --completion-promise "DONE" --max-iterations 15
+```
+
+Each iteration flows automatically:
+1. Hands-free detects loop state
+2. Assesses current progress from files/git
+3. Routes to the right superpowers skill
+4. Auto-accepts all non-destructive decisions
+5. Auto-commits at milestones with `[ralph #N]` prefix
+6. Exits iteration → ralph-loop feeds prompt again
+7. Repeats until `<promise>DONE</promise>`
+
+### What Hands-Free Does NOT Do in Loop Mode
+
+- Does NOT auto-accept `git push` — still a hard stop
+- Does NOT skip the completion promise check — ralph-loop controls termination
+- Does NOT override ralph-loop's `--max-iterations` limit
+- Does NOT re-brainstorm if a design already exists from a prior iteration
+
 ## HARD STOP — Always Pause
 
 Applies in ALL modes. Never auto-accept:
