@@ -43,6 +43,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 | `pyenv` commands | auto | auto | ask | auto |
 | `git init` | auto | auto | ask | auto |
 | `git add` | auto | auto | ask | auto |
+| `cd` within workspace | auto | auto | ask | auto |
 | Destructive actions | **ask** | **ask** | **ask** | auto (in target dir) |
 | Git commit (auto-commit on) | auto | auto | ask | auto |
 | Git push | **ask** | **ask** | **ask** | auto |
@@ -95,6 +96,7 @@ In `full` and `partial` modes, auto-approve Bash/shell tool calls without asking
 - `pyenv` — any pyenv subcommand (`pyenv install`, `pyenv local`, `pyenv global`, etc.)
 - `git init` — initializing a repo
 - `git add` — staging files (not destructive)
+- `cd` within the workspace — changing into any subdirectory of the current workspace
 
 ### Auto-pass when scoped to current directory
 
@@ -124,6 +126,7 @@ digraph {
 | `pyenv install 3.12.0` | auto-pass |
 | `git init` | auto-pass |
 | `git add src/main.py` | auto-pass |
+| `cd src/subdir` | auto-pass (within workspace) |
 | `npm install` | auto-pass (cwd-scoped) |
 | `python -m pytest tests/` | auto-pass (cwd-scoped) |
 | `cp file.txt /etc/config` | ask (escapes cwd) |
