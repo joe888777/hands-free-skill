@@ -39,6 +39,10 @@ Auto-accept recommended options from any skill without pausing. Works with super
 | Batch checkpoints | auto | **ask** | ask | auto |
 | Phase transitions | auto | auto | ask | auto |
 | Grep tool calls | auto | auto | ask | auto |
+| Shell cmd scoped to current dir | auto | auto | ask | auto |
+| `pyenv` commands | auto | auto | ask | auto |
+| `git init` | auto | auto | ask | auto |
+| `git add` | auto | auto | ask | auto |
 | Destructive actions | **ask** | **ask** | **ask** | auto (in target dir) |
 | Git commit (auto-commit on) | auto | auto | ask | auto |
 | Git push | **ask** | **ask** | **ask** | auto |
@@ -81,6 +85,50 @@ The `markdown` field is only visible when the option is focused — it surfaces 
 | writing-plans | Execution method choice | Pick recommended method (full only) |
 | executing-plans | Batch checkpoint | Continue to next batch (full only) |
 | systematic-debugging | Phase transitions | Proceed through all phases |
+
+## Shell Command Auto-Pass Rules
+
+In `full` and `partial` modes, auto-approve Bash/shell tool calls without asking when **any** of these conditions are met:
+
+### Always auto-pass (regardless of paths)
+
+- `pyenv` — any pyenv subcommand (`pyenv install`, `pyenv local`, `pyenv global`, etc.)
+- `git init` — initializing a repo
+- `git add` — staging files (not destructive)
+
+### Auto-pass when scoped to current directory
+
+A shell command is **scoped to the current directory** if it contains no paths that escape the working directory. Auto-pass if the command does NOT contain:
+- Absolute paths outside the current dir (e.g. `/etc`, `/usr`, `~/.ssh`, `/var`)
+- Parent directory traversal (`../`) that exits the current dir
+- System-wide write targets (`/usr/local/bin`, `/etc/hosts`, etc.)
+
+If the command only references relative paths, current-dir files, or env vars scoped to the project, it is safe to auto-pass.
+
+### Decision flow for shell commands
+
+```dot
+digraph {
+    "Shell command" -> "Always-pass list?";
+    "Always-pass list?" -> "Auto-approve" [label="yes (pyenv, git init, git add)"];
+    "Always-pass list?" -> "Paths escape current dir?" [label="no"];
+    "Paths escape current dir?" -> "Auto-approve" [label="no — scoped to cwd"];
+    "Paths escape current dir?" -> "Normal mode rules apply" [label="yes"];
+}
+```
+
+### Examples
+
+| Command | Result |
+|---|---|
+| `pyenv install 3.12.0` | auto-pass |
+| `git init` | auto-pass |
+| `git add src/main.py` | auto-pass |
+| `npm install` | auto-pass (cwd-scoped) |
+| `python -m pytest tests/` | auto-pass (cwd-scoped) |
+| `cp file.txt /etc/config` | ask (escapes cwd) |
+| `rm -rf ~/.config/app` | ask (escapes cwd) |
+| `curl -o /usr/local/bin/tool ...` | ask (writes outside cwd) |
 
 ## Auto-Commit
 
