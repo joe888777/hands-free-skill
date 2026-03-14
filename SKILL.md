@@ -89,7 +89,7 @@ The `markdown` field is only visible when the option is focused — it surfaces 
 
 ## Shell Command Auto-Pass Rules
 
-In `full` and `partial` modes, auto-approve Bash/shell tool calls without asking when **any** of these conditions are met:
+In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool calls without asking when **any** of these conditions are met:
 
 ### Always auto-pass (regardless of paths)
 
