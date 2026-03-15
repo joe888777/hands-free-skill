@@ -14,7 +14,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free full         # same — auto-accept all non-destructive points
 /hands-free partial      # auto-accept design only, pause at execution
 /hands-free off          # disable
-/hands-free crazy-workspace [dir]  # approve everything scoped to [dir], except rm -rf * and rm -rf .git
+/hands-free crazy-workspace         # approve everything under ./, except rm -rf * and rm -rf .git
 /hands-free auto-commit on    # auto-commit changes at natural milestones
 /hands-free auto-commit off   # disable auto-commit (default)
 /hands-free learning <h/m/l>  # set learning sensitivity
@@ -303,30 +303,28 @@ Each iteration flows automatically:
 
 ## Crazy-Workspace Mode
 
-`/hands-free crazy-workspace [dir]` unlocks a maximum-autonomy mode scoped to a specific directory. Designed for sandboxed environments, throwaway repos, or any workspace where speed matters more than caution.
+`/hands-free crazy-workspace` unlocks maximum-autonomy mode scoped to `./` (the current working directory). Designed for sandboxed environments, throwaway repos, or any workspace where speed matters more than caution.
 
 ### Activation
 
 ```
-/hands-free crazy-workspace ~/project/sandbox
+/hands-free crazy-workspace
 ```
-
-If `[dir]` is omitted, defaults to the current working directory.
 
 ### Behavior
 
-- **Auto-approve everything** — git push, merges, resets, force ops, destructive edits, file deletions, package changes, CI changes — all auto-accepted **as long as the operation targets files within `[dir]`**
-- **Scope check** — before auto-approving any destructive action, verify the target path is inside `[dir]`. If it escapes the target dir, treat as a HARD STOP and ask.
+- **Auto-approve everything under `./`** — git push, merges, resets, force ops, destructive edits, file deletions, package changes, CI changes — all auto-accepted as long as the operation targets files within `./`
 - **Two absolute hard stops** (no exceptions, no override):
   - `rm -rf *` — wipes everything indiscriminately
   - `rm -rf .git` — destroys version history
+- Operations targeting paths **outside `./`** → HARD STOP and ask
 
 ### Announce on Activation
 
 When crazy-workspace is activated, print a clear warning:
 
 ```
-Crazy-Workspace ACTIVE — target: ~/project/sandbox
+Crazy-Workspace ACTIVE — scope: ./
 Auto-approving all operations within this directory.
 Hard stops: rm -rf * | rm -rf .git
 ```
@@ -337,9 +335,9 @@ Hard stops: rm -rf * | rm -rf .git
 digraph {
     "Action requested" -> "rm -rf * or rm -rf .git?";
     "rm -rf * or rm -rf .git?" -> "HARD STOP" [label="yes"];
-    "rm -rf * or rm -rf .git?" -> "Within target dir?" [label="no"];
-    "Within target dir?" -> "Auto-approve" [label="yes"];
-    "Within target dir?" -> "HARD STOP" [label="no — escapes scope"];
+    "rm -rf * or rm -rf .git?" -> "Within ./?";
+    "Within ./?" -> "Auto-approve" [label="yes"];
+    "Within ./?" -> "HARD STOP" [label="no — escapes scope"];
 }
 ```
 
@@ -364,7 +362,7 @@ Applies in ALL modes (including crazy-workspace). Never auto-accept:
 **Always hard stop in crazy-workspace too**
 - `rm -rf *` — indiscriminate wipe
 - `rm -rf .git` — destroys version history
-- Any operation targeting paths **outside** the crazy-workspace target dir
+- Any operation targeting paths **outside `./`** in crazy-workspace mode
 
 **Shared/remote state** *(full/partial/off only — crazy-workspace overrides within target dir)*
 - Sending messages (Slack, email, GitHub comments)
