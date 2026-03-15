@@ -313,7 +313,7 @@ Each iteration flows automatically:
 
 ### Behavior
 
-- **Auto-approve everything under `./`** — git push, merges, resets, force ops, destructive edits, file deletions, package changes, CI changes — all auto-accepted as long as the operation targets files within `./`
+- **Auto-approve everything under `./`** — git push, merges, resets, force ops, destructive edits, file deletions, package changes, CI changes — all auto-accepted
 - **Two absolute hard stops** (no exceptions, no override):
   - `rm -rf *` — wipes everything indiscriminately
   - `rm -rf .git` — destroys version history
