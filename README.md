@@ -30,21 +30,38 @@ cp -r autopilot-skill ~/.claude/skills/hands-free
 ## Usage
 
 ```
-/hands-free          # Full auto-accept (default)
-/hands-free full     # Same as above
-/hands-free partial  # Auto-accept design, pause at execution
-/hands-free off      # Back to normal
+/hands-free              # Full auto-accept (default)
+/hands-free full         # Same as above
+/hands-free partial      # Auto-accept design, pause at execution
+/hands-free off          # Back to normal
+/hands-free crazy-workspace       # Max autonomy within ./
+/hands-free auto-commit on        # Auto-commit at natural milestones
+/hands-free auto-commit off       # Disable auto-commit (default)
+/hands-free review-checkpoints on # Pause at phase transitions for review
+/hands-free learning <h/m/l>      # Set learning sensitivity (high/medium/low)
+/hands-free dry-run               # Preview what would be auto-accepted
+/hands-free status                # Show current mode + all settings
+/hands-free recommend             # Suggest optimal settings
+/hands-free log                   # Show session decisions
 ```
 
 ### Modes
 
-| Approval Type | full | partial | off |
-|---|---|---|---|
-| Brainstorming approaches | auto | auto | ask |
-| Design approval | auto | auto | ask |
-| Execution method | auto | ask | ask |
-| Batch checkpoints | auto | ask | ask |
-| Destructive actions | ask | ask | ask |
+| Approval Type | full | partial | off | crazy-workspace |
+|---|---|---|---|---|
+| Brainstorming / design / phase transitions | auto | auto | ask | auto |
+| Execution method | auto | **ask** | ask | auto |
+| Batch checkpoints | auto | **ask** | ask | auto |
+| Shell cmds scoped to cwd / pyenv / git add | auto | auto | ask | auto |
+| Destructive actions (within workspace) | **ask** | **ask** | ask | auto |
+| Review checkpoint (before execution) | skip | **HARD STOP** | **HARD STOP** | skip |
+| Review checkpoint (before push/merge) | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| Git push | **HARD STOP** | **HARD STOP** | **HARD STOP** | auto |
+| `curl \| bash` / pipe-to-shell | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| `chmod 777` / privilege escalation | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| Secrets in staged files | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| `rm -rf *` | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| `rm -rf .git` | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
 
 ### Example
 
@@ -63,6 +80,45 @@ With `/hands-free`:
 Claude: "Going with approach 2 (recommended) — best balance of simplicity and flexibility."
 Claude: "Design approved. Moving to implementation plan."
 Claude: "Going with subagent-driven (recommended for this session)."
+```
+
+### Checking what's active
+
+```
+/hands-free status
+
+Hands-Free Status
+  Mode:                 full
+  Learning:             high
+  Auto-commit:          on
+  Review checkpoints:   off
+  Loop-aware:           no
+
+  Session decisions:    7 auto-accepted, 1 paused
+  Preferences loaded:   2 rules (1 high, 1 medium)
+  Active hard stops:    curl|bash, chmod 777, secrets, rm -rf *, rm -rf .git, git push
+```
+
+### Previewing before enabling
+
+```
+/hands-free dry-run
+
+Hands-Free Dry Run — current mode: off, learning: medium
+
+Would auto-accept (if full mode enabled):
+  Brainstorming approach selection    yes
+  Design approval                     yes
+  Shell commands scoped to cwd        yes
+
+Would PAUSE for (always, all modes):
+  git push                            HARD STOP
+  curl | bash                         HARD STOP
+  chmod 777                           HARD STOP
+  Secrets in staged files             HARD STOP
+  rm -rf *                            HARD STOP
+
+To enable: /hands-free full
 ```
 
 ## Ralph Loop + Superpowers Example

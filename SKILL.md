@@ -17,10 +17,13 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free crazy-workspace         # approve everything under ./, except rm -rf * and rm -rf .git
 /hands-free auto-commit on    # auto-commit changes at natural milestones
 /hands-free auto-commit off   # disable auto-commit (default)
+/hands-free review-checkpoints on   # pause at major phase transitions for review
+/hands-free review-checkpoints off  # skip phase-transition pauses (default in full)
 /hands-free learning <h/m/l>  # set learning sensitivity
+/hands-free dry-run      # preview what hands-free would auto-accept right now
 /hands-free recommend    # show recommended settings based on usage
 /hands-free log          # show session decisions
-/hands-free status       # show current mode + learning level
+/hands-free status       # show current mode + all settings
 ```
 
 ## Recommended Setup
@@ -47,6 +50,10 @@ Auto-accept recommended options from any skill without pausing. Works with super
 | Destructive actions | **ask** | **ask** | **ask** | auto (in target dir) |
 | Git commit (auto-commit on) | auto | auto | ask | auto |
 | Git push | **ask** | **ask** | **ask** | auto |
+| `curl \| bash` / pipe-to-shell | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| `chmod 777` / privilege escalation | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| Review checkpoint (before execution starts) | skip | **HARD STOP** | **HARD STOP** | skip |
+| Review checkpoint (before push/merge) | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
 | `rm -rf *` | **ask** | **ask** | **ask** | **HARD STOP** |
 | `rm -rf .git` | **ask** | **ask** | **ask** | **HARD STOP** |
 
@@ -102,8 +109,11 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 
 A shell command is **scoped to the current directory** if it contains no paths that escape the working directory. Auto-pass if the command does NOT contain:
 - Absolute paths outside the current dir (e.g. `/etc`, `/usr`, `~/.ssh`, `/var`)
-- Parent directory traversal (`../`) that exits the current dir
+- Parent directory traversal (`../`) that exits the current dir after normalization (e.g. `/workspace/../../../etc`)
 - System-wide write targets (`/usr/local/bin`, `/etc/hosts`, etc.)
+- Symlinked paths that resolve outside the workspace (e.g., `ln -s /etc target` followed by operations on `target`)
+- Shell variable expansions that point outside cwd: `$HOME`, `~`, `$XDG_*`, `$TMPDIR` used as write targets
+- Pipe-to-shell patterns: `| bash`, `| sh`, `| zsh` after a network fetch — always HARD STOP regardless of path
 
 If the command only references relative paths, current-dir files, or env vars scoped to the project, it is safe to auto-pass.
 
@@ -153,11 +163,26 @@ When enabled (`/hands-free auto-commit on`), automatically commit changes at nat
 
 ### Safety Rules
 
-- **Never commit** `.env`, credentials, secrets, or large binaries
 - **Never amend** existing commits — always create new ones
 - **Never skip** pre-commit hooks (`--no-verify` is forbidden)
 - If a pre-commit hook fails, announce the failure and pause for user input
 - `git push` is still a **HARD STOP** — auto-commit is local only
+
+**Secrets detection — run before every auto-commit (including crazy-workspace, no exceptions):**
+
+Before staging any file, scan for secrets signals. If any match, abort and announce `Auto-commit blocked — possible secret detected in [filename]. Review and add to .gitignore before proceeding.`
+
+Filename patterns to block:
+- `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`
+- `*_rsa`, `*_dsa`, `*_ed25519`, `*id_rsa`, `*id_ed25519`
+- `*.secret`, `credentials.json`, `secrets.yaml`, `secrets.yml`, `*.keystore`
+
+Content signals in staged diffs (case-insensitive):
+- Token prefixes: `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_`, `AKIA` (AWS key prefix)
+- Key markers: `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`
+- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`
+
+Never override this check, even in crazy-workspace mode. Secrets detection is a hard stop in all modes.
 
 ### Session Log Entry
 
@@ -204,6 +229,66 @@ Record a preference whenever the user **manually chooses** an option — whether
 - 2026-02-26: brainstorming → chose simplest over recommended (1x)
 ```
 
+## `/hands-free status`
+
+When invoked, print a concise state summary:
+
+```
+Hands-Free Status
+  Mode:                 full
+  Learning:             high
+  Auto-commit:          on
+  Review checkpoints:   off
+  Loop-aware:           yes (iteration 3/15)
+
+  Session decisions:    14 auto-accepted, 1 paused
+  Preferences loaded:   3 rules (2 high, 1 medium)
+
+  Active hard stops:    curl|bash, chmod 777, rm -rf *, rm -rf .git, git push
+```
+
+If hands-free is off:
+
+```
+Hands-Free Status
+  Mode: off (inactive)
+  To activate: /hands-free full
+```
+
+## `/hands-free dry-run`
+
+When invoked, simulate what the current mode + learning settings would auto-accept **without actually enabling hands-free or changing any state**. Read-only — no side effects.
+
+Output format:
+
+```
+Hands-Free Dry Run — current mode: [mode], learning: [level]
+
+Would auto-accept:
+  Brainstorming approach selection    yes (full mode)
+  Design approval                     yes (full mode)
+  Execution method choice             yes (full mode)
+  Shell commands scoped to cwd        yes (auto-pass rule)
+  Batch checkpoints                   yes (full mode)
+  Auto-commit at milestones           [on/off — current setting]
+
+Would PAUSE for:
+  git push                            HARD STOP (all modes)
+  curl | bash                         HARD STOP (all modes)
+  chmod 777                           HARD STOP (all modes)
+  Review checkpoint (pre-execution)   [skip/on — depends on mode + setting]
+  Review checkpoint (pre-push/merge)  HARD STOP (all modes)
+  rm -rf *                            HARD STOP (all modes)
+  rm -rf .git                         HARD STOP (all modes)
+  Secrets in staged files             HARD STOP (all modes)
+  Paths escaping workspace            ask (normal rules)
+
+Learned preferences that would apply:
+  [list from preferences.md or "(none yet)"]
+
+To enable: /hands-free [mode]
+```
+
 ## `/hands-free recommend`
 
 When invoked, analyze `preferences.md` and current usage to suggest optimal settings:
@@ -221,6 +306,62 @@ Hands-Free Recommendations:
 - Learning level based on choice consistency
 - Promoting hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation to add)
 - Demoting auto-accept actions to hard-stop if user frequently overrides
+
+## Review Checkpoints
+
+In long multi-phase sessions, review checkpoints provide structured pause-and-summarize moments before transitioning to the next major phase. Unlike hard stops (which block individual actions), review checkpoints block entire phase transitions.
+
+### When Review Checkpoints Fire
+
+A review checkpoint fires when ALL of the following are true:
+1. A major phase has just completed (design → planning, planning → execution, execution → verification)
+2. The completed phase produced significant artifacts (files written, plan created, implementation done)
+3. The next phase is irreversible or costly to redo (execution, push, deploy)
+
+In `full` and `crazy-workspace` modes, review checkpoints are **skipped by default**. Enable explicitly:
+
+```
+/hands-free review-checkpoints on   # pause at phase transitions for review
+/hands-free review-checkpoints off  # skip (default in full mode)
+```
+
+In `partial` mode, review checkpoints are **always on** (they align with the existing "pause at execution" behavior).
+
+### Checkpoint Output Format
+
+When a review checkpoint fires, output:
+
+```
+--- Review Checkpoint: [Phase Name] Complete ---
+
+What was done:
+  - [bullet summary of artifacts created / decisions made]
+  - [file count, test count, or other measurable output]
+
+What comes next:
+  - [description of next phase and what it will do]
+  - [estimated scope: N files to write / N tests to run / etc.]
+
+Options:
+  [C] Continue to [next phase]
+  [R] Revise [current phase output] before continuing
+  [S] Stop here and review manually
+
+Waiting for input...
+```
+
+This is always a HARD STOP — hands-free does NOT auto-proceed through its own review checkpoints.
+
+### Review Checkpoint Triggers by Superpowers Skill
+
+| Completed Phase | Next Phase | Fires In |
+|---|---|---|
+| brainstorming → design approved | writing-plans | if `review-checkpoints on` |
+| writing-plans → plan finalized | executing-plans | **always** (execution is costly to redo) |
+| executing-plans → all batches done | verification-before-completion | if `review-checkpoints on` |
+| verification-before-completion → complete | finishing-a-development-branch | **always** (push/merge is irreversible) |
+
+The two "always" checkpoints (before execution starts, before push/merge) fire regardless of the `review-checkpoints` setting. They are mandatory hard stops.
 
 ## Session Log
 
@@ -249,12 +390,28 @@ Check for `.claude/.ralph-loop.local.md` at the start of each iteration. If pres
 - Iteration 1: Full brainstorming → pick recommended → design → plan
 - Iteration 2+: Read previous work from files/git → continue where left off or improve
 
-**Auto-detect iteration phase.** Each iteration, assess what state the work is in:
-1. No prior work → start fresh with superpowers brainstorming
-2. Partial implementation → continue executing the existing plan
-3. Tests failing → enter systematic-debugging
-4. Tests passing, work incomplete → continue to next plan step
-5. All work complete → output the completion promise
+**Auto-detect iteration phase — concrete algorithm:**
+
+At the start of each iteration, run (in order):
+
+1. `git log --oneline -20` — inspect recent commits for `[ralph #N]` tags
+2. `git status --short` — detect uncommitted changes
+3. Read the last test run output from the iteration's context (if available)
+
+Apply this decision table:
+
+| Condition | Detected State | Routed Skill |
+|---|---|---|
+| No `[ralph #*]` commits AND no plan files exist | No prior work | brainstorming → writing-plans |
+| Plan files exist, no `[ralph #*]` commits | Plan exists, not started | executing-plans (batch 1) |
+| `[ralph #N]` commits exist, last test output shows failures | Tests failing | systematic-debugging |
+| `[ralph #N]` commits exist, tests passing, plan has uncompleted steps | Tests passing, incomplete | executing-plans (next batch) |
+| `[ralph #N]` commits exist, all plan steps complete, all tests passing | Implementation done | verification-before-completion |
+
+"Plan files" = any of: `PLAN.md`, `.claude/plan.md`, `tasks.md`, or files created by writing-plans skill.
+"Last test output" = the final test runner result visible in the current iteration's context.
+
+If the state cannot be determined (ambiguous), default to resuming executing-plans from the last known batch and announce: `[hands-free] Iteration state ambiguous — resuming executing-plans from last batch.`
 
 **Iteration-aware auto-commits.** When auto-commit is on, tag commits with the iteration number:
 ```
@@ -293,6 +450,20 @@ Each iteration flows automatically:
 5. Auto-commits at milestones with `[ralph #N]` prefix
 6. Exits iteration → ralph-loop feeds prompt again
 7. Repeats until `<promise>DONE</promise>`
+
+### Iteration Warnings
+
+When loop-aware, monitor iteration count against `max_iterations` from `.claude/.ralph-loop.local.md`. Issue warnings at these thresholds:
+
+| Remaining iterations | Action |
+|---|---|
+| > 3 remaining | No warning — continue normally |
+| 3 remaining | Print `[hands-free] Warning: 3 iterations remaining (N/max)` and continue |
+| 2 remaining | Print `[hands-free] Warning: 2 iterations remaining — consider narrowing scope` and continue |
+| 1 remaining | Print `[hands-free] FINAL ITERATION — pausing for user review before proceeding` — **PAUSE and ask user whether to continue or stop** |
+| 0 remaining | Ralph-loop controls termination — do not override |
+
+The "1 remaining" pause is the only mandatory pause the warning system introduces. It surfaces before ralph-loop hard-terminates, giving the user a chance to intervene.
 
 ### What Hands-Free Does NOT Do in Loop Mode
 
@@ -353,6 +524,18 @@ Applies in ALL modes (including crazy-workspace). Never auto-accept:
 - "Discard this work" in finishing-branch
 - Deleting branches
 
+**Remote code execution patterns** *(HARD STOP in ALL modes, no exceptions, including crazy-workspace)*
+- Pipe-to-shell: `curl ... | bash`, `curl ... | sh`, `wget ... | bash`, `wget ... | sh`
+- Any variant ending in `| bash`, `| sh`, `| zsh` after a network fetch
+- `eval $(curl ...)`, `eval $(wget ...)`, `eval "$(curl ...)"`, or similar
+- `bash <(curl ...)` or `sh <(wget ...)` process substitution patterns
+
+**Privilege escalation** *(HARD STOP in ALL modes, no exceptions, including crazy-workspace)*
+- `chmod 777` on any path (world-writable)
+- `chmod -R 777` or `chmod a+rwx` (recursive world-writable)
+- `sudo` commands that write to system paths (`/etc`, `/usr`, `/bin`, `/sbin`, `/opt`)
+- `chown root` or changing ownership to root
+
 **Destructive file/system operations** *(full/partial/off only — crazy-workspace overrides within target dir)*
 - `rm -rf` or bulk file/directory deletion
 - Dropping database tables or destructive migrations
@@ -362,6 +545,9 @@ Applies in ALL modes (including crazy-workspace). Never auto-accept:
 **Always hard stop in crazy-workspace too**
 - `rm -rf *` — indiscriminate wipe
 - `rm -rf .git` — destroys version history
+- Pipe-to-shell (`curl | bash`, `wget | sh`, etc.) — remote code execution
+- Privilege escalation (`chmod 777`, `sudo` to system paths)
+- Secrets-containing commits (blocked by secrets detection above)
 - Any operation targeting paths **outside `./`** in crazy-workspace mode
 
 **Shared/remote state** *(full/partial/off only — crazy-workspace overrides within target dir)*
@@ -389,3 +575,7 @@ digraph {
 | "Merge to main is obvious" | All merges need approval |
 | "Discarding saves time" | Destructive — ask first |
 | "Force push will fix it" | Irreversible — ask first |
+| "curl \| bash is standard practice" | Remote code execution — always ask |
+| "chmod 777 is just for local dev" | World-writable — always ask |
+| "It's just a token in a comment" | Secrets detection fires — block and review |
+| "This symlink stays in the repo" | Symlink may escape workspace — verify first |
