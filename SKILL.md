@@ -3166,3 +3166,11 @@ digraph {
 | "cargo generate with a GitHub URL is like cargo new" | Downloads and executes remote code — ask first |
 | "docker run --rm is safe because it's ephemeral" | Unknown images execute arbitrary code — ask for unfamiliar images |
 | "xargs rm is just a list" | Bulk deletion — classified as ask, same as find -exec rm |
+| "LD_PRELOAD is just for debugging" | Injects shared library into process — can intercept all system calls; HARD STOP if outside cwd |
+| "eval $VAR is just running a variable" | Variable may contain network-fetched code — HARD STOP if origin is unknown |
+| "socat EXEC:bash is just for testing" | Creates a reverse shell relay to remote — **UNIVERSAL HARD STOP** |
+| "python -m http.server --directory /etc is read-only" | Exposes /etc over HTTP to network — HARD STOP (serves system files) |
+| "SSH -R just forwards a port" | Exposes your local port to the remote server — ask; remote might be publicly accessible |
+| "--dry-run always works the same way" | Some tools' --dry-run still writes state or sends API calls — verify before assuming no-op |
+| "The command has --insecure but it's just internal" | TLS bypass is a universal escalation regardless of target — always ask |
+| "fly deploy is within ./" | Deploys to external Fly.io infrastructure — not local, not within ./ scope |
