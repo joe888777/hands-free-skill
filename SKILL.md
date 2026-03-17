@@ -1,7 +1,7 @@
 ---
 name: hands-free
 version: 2.3.0
-description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, and shell script content scanning. Comprehensive tool classification for uv/poetry/pipenv/conda, Rust (nextest/cross/miri/cargo watch), TypeScript (tsup/vite/esbuild/biome), Docker, Redis, SQL DDL, server startup, kubectl, AWS CLI, GitHub CLI, GitLab CLI, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna), local CI runners, security testing tools, debugging tools, and 350+ command patterns. Commands: /hands-free check (preview classification), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
+description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Commands: /hands-free check (preview classification), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
 # Hands-Free
@@ -2170,6 +2170,77 @@ digraph {
 | `temporal server start-dev` | auto-pass (local dev Temporal server) |
 | `temporal workflow list` | auto-pass (read-only) |
 | `temporal workflow start --workflow-type MyWF` | ask (triggers remote execution) |
+| `gcc ./src/main.c -o ./build/app` | auto-pass (cwd-scoped C compilation) |
+| `clang-tidy ./src/main.cpp -- -std=c++17` | auto-pass (cwd-scoped static analysis) |
+| `cppcheck ./src/` | auto-pass (cwd-scoped C/C++ analysis) |
+| `rebar3 compile` | auto-pass (cwd-scoped Erlang build) |
+| `rebar3 publish` | ask (publishes to hex.pm — external) |
+| `ctr images list` | auto-pass (read-only containerd image list) |
+| `ctr images pull ubuntu:22.04` | ask (downloads from remote registry) |
+| `grpcurl -plaintext localhost:50051 list` | auto-pass (read-only localhost gRPC listing) |
+| `grpcurl -plaintext remote.host:50051 list` | ask (remote gRPC endpoint) |
+| `tox -e lint` | auto-pass (cwd-scoped tox lint env) |
+| `tox -e publish` | ask (publishes to PyPI — external) |
+| `pip-compile ./requirements.in` | auto-pass (writes requirements.txt to cwd) |
+| `pip-sync ./requirements.txt` | ask (modifies active Python environment) |
+| `stylelint ./src/**/*.css` | auto-pass (cwd-scoped style linting) |
+| `gosec ./...` | auto-pass (cwd-scoped Go security scanner) |
+| `tmux ls` | auto-pass (read-only session listing) |
+| `tmux kill-session -t mysession` | ask (terminates session and its processes) |
+| `just --list` | auto-pass (read-only recipe listing) |
+| `just build` | auto-pass (recipe name matches safe pattern) |
+| `just deploy` | ask (recipe name matches deploy pattern) |
+| `vector validate ./vector.yaml` | auto-pass (cwd-scoped config validation) |
+| `otelcol --config ./otelcol.yaml` | ask (starts collector, emits to remote backends) |
+| `clickhouse-client --host localhost --query "SELECT count() FROM table"` | auto-pass (read-only localhost query) |
+| `rails generate model User name:string` | auto-pass (cwd-scoped code generation) |
+| `rails db:migrate` | auto-pass (runs pending local DB migrations) |
+| `rails db:drop` | ask (destroys the database) |
+| `rails console` | ask (interactive console with real DB access) |
+| `mix phx.gen.html Accounts User users name:string` | auto-pass (cwd-scoped Phoenix code generation) |
+| `mix ecto.drop` | ask (drops the database) |
+| `python manage.py shell` | ask (interactive shell with real DB access) |
+| `python manage.py collectstatic --noinput` | auto-pass (cwd-scoped static file collection) |
+| `python manage.py showmigrations` | auto-pass (read-only migration listing) |
+| `dotnet build ./src/App.csproj` | auto-pass (cwd-scoped .NET build) |
+| `dotnet publish` | ask (publishes application — may deploy) |
+| `dotnet ef database update` | auto-pass (applies EF Core migrations to local DB) |
+| `nginx -t` | auto-pass (read-only nginx config validation) |
+| `nginx -s reload` | ask (reloads running nginx — system service) |
+| `caddy validate --config ./Caddyfile` | auto-pass (cwd-scoped config validation) |
+| `caddy reload --config ./Caddyfile` | ask (reloads running Caddy — system service) |
+| `rspec ./spec/` | auto-pass (cwd-scoped RSpec tests) |
+| `rubocop -a ./lib/` | auto-pass (cwd-scoped auto-correct) |
+| `wandb sync ./wandb/` | ask (uploads to W&B servers — remote state) |
+| `wandb offline` | auto-pass (disables remote syncing) |
+| `bandit -r ./src` | auto-pass (cwd-scoped Python security linter) |
+| `semgrep --config ./rules/ ./` | auto-pass (local rules, cwd-scoped) |
+| `semgrep --config auto ./` | ask (downloads rules from remote — potential code upload) |
+| `dependency-check --scan ./` | auto-pass (OWASP scan; cwd-scoped; read-only) |
+| `age -e -r <pubkey> ./file.txt -o ./file.txt.age` | auto-pass (cwd-scoped encryption) |
+| `sops --encrypt ./secrets.yaml` | auto-pass (cwd-scoped secrets encryption) |
+| `sops --decrypt ./secrets.yaml` | ask (exposes plaintext secrets to stdout) |
+| `openapi-generator-cli generate -i ./openapi.yaml -g typescript-fetch -o ./generated/` | auto-pass (cwd-scoped) |
+| `rover graph introspect http://localhost:4000/graphql` | auto-pass (localhost GraphQL) |
+| `rover subgraph publish` | ask (pushes schema to Apollo Registry) |
+| `tcpdump -i lo -w ./capture.pcap` | ask (captures potentially sensitive traffic) |
+| `tcpdump -r ./capture.pcap` | auto-pass (reads existing capture file) |
+| `kube-score score ./k8s/deployment.yaml` | auto-pass (cwd-scoped quality score) |
+| `kubeval ./k8s/*.yaml` | auto-pass (cwd-scoped manifest validation) |
+| `istioctl analyze ./k8s/` | auto-pass (cwd-scoped Istio config analysis) |
+| `istioctl install` | ask (modifies Kubernetes cluster — remote state) |
+| `coverage run -m pytest ./tests/` | auto-pass (cwd-scoped Python coverage run) |
+| `npm outdated` | auto-pass (read-only, checks for newer versions) |
+| `cargo outdated` | auto-pass (read-only Rust dep staleness check) |
+| `bundle outdated` | auto-pass (read-only Ruby gem staleness check) |
+| `supervisorctl status` | auto-pass (read-only process status) |
+| `supervisorctl restart myapp` | ask (modifies running process state) |
+| `shfmt -w ./scripts/deploy.sh` | auto-pass (cwd-scoped in-place shell formatter) |
+| `envsubst < ./templates/config.yaml.tmpl > ./config.yaml` | auto-pass (cwd-scoped template substitution) |
+| `pg_dump -h localhost -Fc ./backup.dump` | auto-pass (local DB dump to cwd) |
+| `pg_restore -h localhost -d mydb ./backup.dump` | ask (restores into DB — modifies DB state) |
+| `pg_restore -l ./backup.dump` | auto-pass (lists backup contents; read-only) |
+| `sqlite3 ./db.sqlite .dump > ./backup.sql` | auto-pass (exports SQLite to cwd) |
 
 ## Auto-Commit
 
