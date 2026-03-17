@@ -261,9 +261,15 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 - `git init` — initializing a repo
 - `git add` — staging files (not destructive)
 - `git checkout -b <branch>` — creating a new local branch (non-destructive)
+- `git checkout <branch>` — switching branches (non-destructive when no uncommitted changes)
+- `git switch <branch>` — modern branch switch (same as checkout; safe)
+- `git switch -c <new-branch>` — create and switch (same as checkout -b)
 - `git branch <name>` — creating a new local branch
 - `git stash` / `git stash pop` — stashing and restoring work (recoverable)
-- `git log`, `git status`, `git diff`, `git show` — read-only git inspection
+- `git restore --staged <file>` — unstage a file (does NOT discard changes)
+- `git log`, `git status`, `git diff`, `git show`, `git fetch` — read-only git inspection
+
+Note: `git restore <file>` (without `--staged`) DISCARDS local changes and is NOT auto-pass — ask first.
 - `cd` within the workspace — changing into any subdirectory of the current workspace
 - `pnpm install` / `yarn install` — package manager installs (cwd-scoped; equivalent to `npm install`)
 
