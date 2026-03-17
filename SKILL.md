@@ -524,6 +524,19 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `kubectl exec -it <pod> -- bash` → ask (opens a shell in a remote Kubernetes pod)
 - `kubectl apply -f ./k8s/` → auto-pass in full (applies local manifests; cwd-scoped); ask in partial (deploys to cluster — execution-type)
 - `kubectl delete` → ask (destructive cluster operation)
+- `kubectl get pods/services/deployments/nodes/namespaces` → auto-pass (read-only cluster inspection)
+- `kubectl get <resource> -o yaml` → auto-pass (read-only YAML output)
+- `kubectl describe pod/service/deployment <name>` → auto-pass (read-only description)
+- `kubectl logs <pod>` / `kubectl logs -f <pod>` → auto-pass (read-only log streaming)
+- `kubectl port-forward <pod> 8080:8080` → auto-pass (local port forward to pod — localhost only, no remote writes)
+- `kubectl cluster-info` / `kubectl version` / `kubectl config view` → auto-pass (read-only)
+- `kubectl config use-context <ctx>` → ask (changes active cluster context — affects all subsequent kubectl commands)
+- `kubectl rollout status deployment/<name>` → auto-pass (read-only rollout monitoring)
+- `kubectl rollout restart deployment/<name>` → ask (triggers pod restart — modifies cluster state)
+- `kubectl scale deployment/<name> --replicas=N` → ask (modifies cluster state)
+- `kubectl patch` → ask (modifies cluster resources)
+- `kubectl create -f ./manifest.yaml` → auto-pass in full (creates resources from local file, cwd-scoped); ask in partial
+- `kubectl label`/`kubectl annotate` → ask (modifies resource metadata in cluster)
 - `docker cp <container>:/path ./local` → auto-pass (copies file out of container to cwd — read-only for the container)
 - `docker cp ./local <container>:/path` → auto-pass in full (copies file into container — local Docker only, no remote side effects)
 - `docker logs <container>` / `docker inspect <container>` → auto-pass (read-only container inspection)
@@ -572,7 +585,11 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `brew update` → ask (modifies Homebrew installation); `brew list`, `brew info`, `brew search` → auto-pass (read-only)
 - `./script.sh` / `bash ./script.sh` / `sh ./script.sh` — running a local cwd script → auto-pass in full if the script file is within cwd AND Claude can verify the script doesn't embed hard stop patterns; ask if the script wasn't written by Claude in this session
 - `python ./script.py` / `node ./main.js` / `ruby ./script.rb` — running a local cwd script → same rules as shell scripts above; auto-pass if cwd-scoped and known-safe
-- `npm run <script>` — runs a package.json script → auto-pass if the script name is a known safe target (`test`, `build`, `lint`, `format`, `check`, `typecheck`, `dev`); ask if the script name is unfamiliar (e.g., `npm run deploy`, `npm run postinstall`)
+- `npm run <script>` — runs a package.json script → auto-pass if the script name matches a known-safe pattern; ask otherwise:
+  - **Auto-pass targets:** `test`, `test:*`, `build`, `build:*`, `lint`, `lint:*`, `format`, `format:*`, `check`, `check:*`, `typecheck`, `type-check`, `dev`, `dev:*`, `start`, `serve`, `watch`, `watch:*`, `clean`, `compile`, `compile:*`, `generate`, `generate:*`, `preview`, `storybook`, `prepare`, `postinstall` (dependency setup), `validate`, `verify`
+  - **Ask targets:** `deploy`, `deploy:*`, `release`, `release:*`, `publish`, `push`, `ship`, `upload`, `migrate:*` (if unfamiliar), any script with `prod`/`production` in the name
+  - **Unknown targets:** If the script name doesn't match either pattern, inspect `package.json` to read the script definition before classifying. If the definition is a safe build/test command → auto-pass. If it runs a deploy tool or writes outside cwd → ask.
+  - This pattern applies equally to `pnpm run`, `yarn run`, and `bun run`
 - `npx <package>@latest` or `npx <unfamiliar-package>` without a version pin → ask (downloads and runs arbitrary remote package); `npx <well-known-package>` like `npx eslint`, `npx vitest`, `npx jest`, `npx ts-node`, `npx prisma` → auto-pass (cwd-scoped, known tool)
 - `git stash drop` / `git stash drop stash@{N}` → ask (permanently discards a stash entry — not recoverable)
 - `git stash clear` → ask (destroys all stash entries — irreversible)
@@ -580,6 +597,17 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `openssl genrsa`, `openssl req`, `openssl x509`, `ssh-keygen`, `gpg --gen-key` → auto-pass if writing to cwd (key/cert generation is local, cwd-scoped); ask if writing to `~/.ssh/`, `~/.gnupg/` or any path outside cwd (modifies user's credential store)
 - `htpasswd -c ./auth/.htpasswd user` → auto-pass (creates password file within cwd; hash-only, no plaintext stored); `htpasswd -c /etc/nginx/.htpasswd user` → ask (writes outside cwd)
 - `strace -p <pid>` / `ltrace -p <pid>` → ask (attaches to a running process — can expose sensitive data from arbitrary processes); `strace ./cwd-program` → auto-pass (traces a local program)
+- `gdb ./cwd-program` / `lldb ./cwd-program` → auto-pass (debugs a local binary, cwd-scoped); `gdb -p <pid>` → ask (attaches to running process)
+- `valgrind ./cwd-program` / `valgrind --tool=memcheck ./cwd-program` → auto-pass (memory analysis of local binary)
+- `perf stat ./cwd-program` / `perf record ./cwd-program` → auto-pass (performance profiling of local binary); `perf stat -p <pid>` → ask (attaches to running process)
+- `heaptrack ./cwd-program` → auto-pass (cwd-scoped heap profiling)
+- `flamegraph`-related tools targeting cwd binaries → auto-pass (read-only perf data collection and visualization)
+- **Security testing tools (dual-use):** These require clear authorization context (own system, CTF, authorized pentest). Without context, always ask:
+  - `nmap localhost` → auto-pass (scanning own local machine); `nmap <remote-ip>` → ask (requires authorization)
+  - `nmap 127.0.0.1` / `nmap 0.0.0.0/0` → ask (broad scans require explicit context)
+  - `sqlmap`, `nikto`, `gobuster`, `ffuf`, `dirb`, `hydra`, `john`, `hashcat`, `metasploit` → always ask (dual-use security tools require authorization context)
+  - `burpsuite`, `zaproxy` against `localhost` with test endpoints → auto-pass in full if clearly against own local dev server; ask otherwise
+  - `curl -H "X-CSRF-Token: fake" ...` against localhost test server → auto-pass; against remote → ask
 - `uvicorn main:app` / `uvicorn main:app --host localhost` → auto-pass (local dev server, localhost only); `uvicorn main:app --host 0.0.0.0` → ask (binds to all interfaces, network-visible)
 - `gunicorn --bind 127.0.0.1:8000 app:app` → auto-pass (localhost bind, cwd-scoped); `gunicorn --bind 0.0.0.0:8000 ...` → ask (network-visible)
 - `flask run` / `python manage.py runserver` → auto-pass (local dev server, localhost only by default)
