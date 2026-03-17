@@ -176,7 +176,7 @@
 - `/hands-free recommend prune` added to commands list
 - `/hands-free log --full` noted in commands
 
-### Added (iteration 10 — batch 41–45)
+### Added (iteration 10 — batch 41–50)
 
 **IaC and cloud provisioning tools**
 - Pulumi: `preview/stack ls/stack output` → auto; `up/destroy/refresh/import` → ask
@@ -203,6 +203,48 @@
 
 **Container alternatives**
 - Podman and nerdctl: same rules as Docker equivalents (build/run/ps/inspect → auto; push/login/logout → ask)
+
+**Security meta-rules (batches 47–49)**
+- `--version/--help/-V/-h` meta-rule: always auto-pass (read-only, prints info and exits)
+- Dry-run/check/plan flag detection: `--dry-run/--check/--plan/-n (rsync/make)` → auto-pass even for tools that normally ask; examples: `flyway migrate --dry-run`, `kubectl apply --dry-run=client`, `rsync -n`
+- `--force/--overwrite` escalation: commands auto-passing without --force escalate to ask with --force
+- `-r/--recursive` with destructive commands: escalate to ask
+- Output destination rule: cmd auto-passes + dest in cwd → auto; dest escapes cwd → ask
+- Config file sourcing: config in cwd → base cmd rule; config outside cwd → ask
+- `--insecure/--no-verify/--skip-ssl` escalation: any TLS bypass flag → ask even if base auto-passes
+- `--global/--system` escalation: writes outside cwd → always ask
+- Network interface binding: localhost → auto; 0.0.0.0 → ask; privileged port (<1024) → ask
+
+**Mobile and cross-platform tools (batch 50)**
+- Dart/Flutter: pub get/upgrade/analyze/format/test → auto; pub publish → ask
+- Flutter: build/run/test/analyze → auto (cwd-scoped or localhost)
+- Swift/Xcode: swift build/test/run/package → auto; swiftlint/swiftformat → auto
+- xcodebuild test/archive/export → auto (cwd-scoped)
+- Kotlin/Android: ./gradlew build/test/lint → auto; publish → ask
+- detekt/checkstyle/kotlinc → auto-pass
+
+**Load testing tools (batch 50)**
+- k6 run (localhost) → auto; k6 run (remote URL) → ask; k6 cloud → ask
+- locust/ab/wrk: localhost → auto; remote target → ask
+- vegeta: classify by target hosts in targets file
+
+**Additional specialized tools (batch 46)**
+- GitHub CLI codespace: list/view → auto; ssh/create/delete → ask; repo clone → auto; extension install/upgrade → ask
+- pnpm dlx/yarn dlx: well-known → auto; unfamiliar → ask
+- RabbitMQ: list/status → auto; purge/delete/stop → ask
+- Celery: inspect/worker → auto; call/purge → ask
+- Mercurial (hg): log/diff/status/add/commit → auto; push → ask; strip → ask
+- git sparse-checkout/bundle: all local ops → auto
+- Monitoring: promtool check/lint/localhost query → auto; remote → ask
+- Sourcegraph CLI (`src`): all ops → ask (external service)
+
+**Troubleshooting additions (batches 46–49)**
+- `--dry-run` vs. base command distinction (flyway migrate example)
+- gh extension install blocking (remote code to outside cwd)
+- celery call blocking (message queue side effects)
+- nix-env install vs nix develop (permanent profile vs session-scoped)
+- --dry-run still blocked edge case (CLAUDE.md override pattern)
+- hg push blocked same as git push explanation
 
 **Shell built-ins, scheduling, network, GPG (batch 44)**
 - Shell built-ins: `type/which/command -v` → auto; `source ./known` → auto, `source unknown` → ask; `exec` → classify by inner cmd
