@@ -270,6 +270,14 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 - `git log`, `git status`, `git diff`, `git show`, `git fetch` — read-only git inspection
 
 Note: `git restore <file>` (without `--staged`) DISCARDS local changes and is NOT auto-pass — ask first.
+
+Additional git command behavior (governed by normal mode rules, not always-pass):
+- `git revert <commit>` → auto-pass in full mode (creates a new commit, reversible)
+- `git cherry-pick <commit>` → auto-pass in full mode (applies a commit, non-destructive)
+- `git clean -n` → auto-pass (dry run, read-only)
+- `git clean -fd`, `git clean -fdx` → ask in full mode (removes untracked/gitignored files)
+- `git reset --soft HEAD~1` → ask in full mode (unstages last commit while keeping changes)
+- `git reset --hard HEAD~1` → ask in all modes (discards last commit AND changes — destructive)
 - `cd` within the workspace — changing into any subdirectory of the current workspace
 - `pnpm install` / `yarn install` — package manager installs (cwd-scoped; equivalent to `npm install`)
 
