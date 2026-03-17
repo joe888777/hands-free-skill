@@ -1,5 +1,6 @@
 ---
 name: hands-free
+version: 2.0.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, privilege escalation, and secrets detection in all modes.
 ---
 
@@ -724,6 +725,50 @@ digraph {
 ```
 
 ---
+
+## Troubleshooting
+
+### "Hands-free isn't auto-accepting when I expect it to"
+
+Check in order:
+1. `/hands-free status` — is mode `off`? Is `Paused: yes`?
+2. Is the approval point a hard stop? (See the mode table — hard stops never auto-accept)
+3. Is review checkpoints on? The two mandatory checkpoints (pre-execution, pre-push) always pause
+4. Is this in `partial` mode? Execution-type decisions pause in partial mode
+
+### "Hands-free is blocking something unexpected"
+
+Common causes:
+- The command contains a pipe-to-shell pattern (`| bash`, `| sh`) — universal hard stop
+- A file path escapes the workspace (`../`, `$HOME`, symlink target)
+- A staged file matches a secrets filename pattern (`.env`, `*.pem`, etc.)
+- A staged diff contains a content signal (`password=`, `AKIA`, `-----BEGIN`)
+- The command uses `chmod 777` or `sudo` to a system path
+
+Use `/hands-free explain` after the block to see which rule triggered it.
+
+### "My learned preferences aren't being applied"
+
+Check:
+- Preference confidence level — low (1-2x) doesn't auto-apply, only tracks
+- Learning sensitivity — is it set to `low`? (`/hands-free learning h` for high)
+- The choice matches the skill key exactly — `writing-plans` preferences apply to the writing-plans skill's approval points only
+- `/hands-free status` shows how many preferences are loaded
+
+### "Auto-commit is committing unexpected files"
+
+Auto-commit uses `git add <specific files>` per task — it should never add files you didn't touch. If unexpected files appear:
+- Check if another process modified them
+- Check `git status` before the next auto-commit
+- Use `/hands-free auto-commit off` to disable and commit manually
+
+### "The loop stopped at max-iterations without completing"
+
+Options:
+- Increase `--max-iterations` and restart the loop
+- Use `/hands-free status` to check what iteration state was detected
+- Review the git log for where progress stopped: `git log --oneline -20`
+- If systematic-debugging kept running, narrow the scope or fix the underlying test failure
 
 ## HARD STOP — Always Pause
 
