@@ -469,6 +469,11 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 - `git restore --staged <file>` — unstage a file (does NOT discard changes)
 - `git log`, `git status`, `git diff`, `git show`, `git fetch` — read-only git inspection
 - `git ls-files`, `git blame`, `git shortlog`, `git describe`, `git rev-parse`, `git remote -v` — read-only git queries
+- `git reflog` / `git reflog show` / `git reflog --oneline` → auto-pass (read-only: shows reference log of HEAD movements; useful for recovering lost commits)
+- `git reflog delete` → ask (removes entries from the reflog — can make lost commits unrecoverable)
+- `git archive --format=zip HEAD -o ./release.zip` → auto-pass (creates archive from cwd repo; output is cwd-scoped)
+- `git archive --format=tar.gz HEAD | gzip > ./release.tar.gz` → auto-pass (pipe to gzip is cwd-scoped)
+- `git archive HEAD --remote=origin ./subdir` → ask (fetches archive from remote — network op)
 - `git tag <name>` / `git tag -a <name> -m "..."` — creating a local tag (non-destructive; doesn't push)
 - `git commit -m "..."` — non-amend local commit without `-a` flag (only if staged files exist)
 - `git worktree add <path>` — creates a local linked worktree (non-destructive; reversible with `git worktree remove`)
@@ -826,6 +831,22 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `docker system prune` → ask (removes stopped containers, dangling images, unused networks — destructive)
 - `docker system prune -a` → ask (removes ALL unused images, not just dangling — even more destructive)
 - `docker exec <container> <cmd>` → ask (executes command inside running container; risk depends on cmd and container contents; similar to kubectl exec)
+- **Docker Compose:**
+  - `docker compose up` / `docker compose up --build -d` → auto-pass (cwd-scoped; starts services defined in `compose.yaml`)
+  - `docker compose build` → auto-pass (cwd-scoped image build; same as `docker build`)
+  - `docker compose down` → auto-pass (stops and removes containers from this compose project; local state, non-destructive to volumes by default)
+  - `docker compose down -v` → ask (removes containers AND named volumes — destructive to persisted data)
+  - `docker compose ps` / `docker compose logs` / `docker compose top` → auto-pass (read-only status/logs)
+  - `docker compose run <service> <cmd>` → auto-pass in full if the service is cwd-scoped (same rule as `docker run` for well-known images); ask if the compose file references an unfamiliar external image
+  - `docker compose exec <service> <cmd>` → ask (executes inside running container; same as `docker exec`)
+  - `docker compose restart <service>` → ask (restarts containers — modifies running state)
+  - `docker compose kill` → ask (sends signal to running containers — modifies running state)
+  - `docker compose rm` → ask (removes stopped containers; may delete data if they have anonymous volumes)
+  - `docker compose pull` → auto-pass (downloads images; no code executed)
+  - `docker compose push` → ask (pushes images to remote registry — external state)
+  - `docker compose config` → auto-pass (read-only: validates and prints resolved compose config)
+  - `docker compose port <service> <private-port>` → auto-pass (read-only port mapping)
+  - `docker compose scale <service>=N` → ask (modifies number of running containers — cluster state change)
 - `redis-cli get <key>`, `redis-cli keys <pattern>`, `redis-cli info`, `redis-cli monitor` → auto-pass if connecting to localhost (read-only local Redis); ask if connecting to a remote Redis host
 - `redis-cli set <key> <value>`, `redis-cli del <key>`, `redis-cli flushdb`, `redis-cli flushall` → ask (mutates data; `flushall` is especially destructive)
 - `pg_isready` → auto-pass (read-only health check for local PostgreSQL)
