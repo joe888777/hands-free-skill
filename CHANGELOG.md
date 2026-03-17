@@ -176,7 +176,7 @@
 - `/hands-free recommend prune` added to commands list
 - `/hands-free log --full` noted in commands
 
-### Added (iteration 10 — batch 41–42)
+### Added (iteration 10 — batch 41–43)
 
 **IaC and cloud provisioning tools**
 - Pulumi: `preview/stack ls/stack output` → auto; `up/destroy/refresh/import` → ask
@@ -203,6 +203,22 @@
 
 **Container alternatives**
 - Podman and nerdctl: same rules as Docker equivalents (build/run/ps/inspect → auto; push/login/logout → ask)
+
+**Secrets detection expanded (batch 43)**
+- Platform-specific token prefixes: `dop_v1_` (DigitalOcean), `glpat-` (GitLab), `github_pat_` (new GitHub PAT), `sk_live_/rk_live_/pk_live_` (Stripe live keys), `AIza` (Google), `ya29.` (Google OAuth), `SG.` (SendGrid)
+- AWS credential prefixes expanded: `AGPA`, `AROA`, `ASIA`, `AIPA`, `ANPA`, `ANVA`, `APKA`
+- JWT token detection: `eyJ` literal prefix flag in non-test code
+- Additional assignment patterns: `webhook_secret=`, `encryption_key=`, `jwt_secret=`, `session_secret=`, `master_key=`
+- Cloudflare and HashiCorp Vault token patterns
+- False positive reduction: skip `test/`, `examples/`, `fixtures/` dirs; skip comments; skip placeholder values; skip env var references
+
+**CLAUDE.md Override Reference section (batch 43)**
+- Comprehensive syntax documentation for persistent per-project and user-global overrides
+- Available persistent settings table (Default mode, Auto-commit, Learning, Review checkpoints)
+- Command-level, tool-level, and pattern-level override examples
+- Override precedence rules (CLAUDE.md > built-in > MCP heuristic)
+- Override scope (project vs user-global CLAUDE.md)
+- Override annotation pattern (document WHY overrides exist)
 
 **SaaS service CLIs (batch 42)**
 - Stripe CLI: `listen/logs tail` → auto; `trigger/events resend/login` → ask; `fixtures` → auto

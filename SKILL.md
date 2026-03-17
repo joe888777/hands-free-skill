@@ -1472,11 +1472,21 @@ Filename patterns to block:
 - `*.cer`, `*.der`, `*.crt` — certificate files that may include private key material
 
 Content signals in staged diffs (case-insensitive):
-- Token prefixes: `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_`, `AKIA` (AWS key prefix), `xoxb-`, `xoxp-` (Slack tokens)
-- Key markers: `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`, `-----BEGIN PGP`
-- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`, `database_url=`, `signing_key=`, `client_secret=`, `totp_secret=`, `smtp_password=`, `ftp_password=`, `sftp_password=`, `access_key=`, `auth_token=`
-- HTTP auth headers hardcoded in source: `Authorization: Bearer `, `X-Api-Key: `, `X-Auth-Token: ` (case-insensitive) in non-test, non-example files
-- Hardcoded connection strings: `postgres://` or `postgresql://` with a password component (`postgresql://user:password@...`), `mongodb+srv://user:pass@`, `amqp://user:pass@`
+- **Generic token prefixes:** `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_` (GitHub tokens), `AKIA`/`AGPA`/`AROA`/`ASIA`/`AIPA`/`ANPA`/`ANVA`/`APKA` (AWS credential prefixes), `xoxb-`, `xoxp-`, `xoxe-` (Slack tokens)
+- **Platform-specific prefixes:** `AIza` (Google API keys), `ya29.` (Google OAuth tokens), `dop_v1_` (DigitalOcean Personal Access Token), `glpat-` (GitLab Personal Access Token), `github_pat_` (new GitHub PAT format, 36+ chars), `sk_live_`, `rk_live_`, `pk_live_` (Stripe live-mode keys), `AC` followed by 32 hex chars (Twilio Account SID + secret), `SG.` (SendGrid API key prefix)
+- **JWT tokens:** `eyJ` followed by a base64-encoded segment (all JWTs start with `eyJhbGciOi` or similar) — flag when appearing in non-test code as a hardcoded literal
+- **Key markers:** `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`, `-----BEGIN PGP`, `-----BEGIN CERTIFICATE REQUEST`
+- **Assignment patterns:** `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`, `database_url=`, `signing_key=`, `client_secret=`, `totp_secret=`, `smtp_password=`, `ftp_password=`, `sftp_password=`, `access_key=`, `auth_token=`, `webhook_secret=`, `encryption_key=`, `jwt_secret=`, `session_secret=`, `master_key=`
+- **HTTP auth headers hardcoded in source:** `Authorization: Bearer `, `X-Api-Key: `, `X-Auth-Token: `, `X-Stripe-Key: `, `Stripe-Secret-Key: ` (case-insensitive) in non-test, non-example files
+- **Hardcoded connection strings with credentials:** `postgres://user:pass@`, `postgresql://user:pass@`, `mongodb+srv://user:pass@`, `amqp://user:pass@`, `redis://:password@`, `mysql://user:pass@` (any URI with a password component before `@`)
+- **Cloudflare tokens:** `CF_API_TOKEN=` assignment with non-placeholder value; `CF_API_KEY=` (global API key)
+- **Vault/Consul tokens:** `s.` followed by 24+ chars (Vault token format); `hvs.` (HashiCorp Vault Service Token)
+
+**False positive reduction:** Do NOT fire on:
+- Lines prefixed with `#` (comments) — these are documentation
+- Files in `test/`, `tests/`, `spec/`, `__tests__/`, `fixtures/`, `examples/` directories — test files routinely contain fake credentials
+- Values that are clearly placeholders: `your-api-key-here`, `<YOUR_TOKEN>`, `REPLACE_ME`, `example`, `placeholder`, `changeme`, `test-secret`, `dummy`, `fake-key`, `xxx`
+- Environment variable references: `process.env.API_KEY`, `os.environ["SECRET"]`, `$API_KEY`, `${TOKEN}` — these reference env vars, not embed values
 
 Never override this check, even in crazy-workspace mode. Secrets detection is a hard stop in all modes.
 
@@ -2284,6 +2294,100 @@ digraph {
     "Within ./?" -> "Auto-approve" [label="yes"];
     "Within ./?" -> "HARD STOP" [label="no — escapes scope"];
 }
+```
+
+---
+
+## CLAUDE.md Override Reference
+
+Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free overrides` section to customize behavior persistently across sessions without typing commands.
+
+### Syntax
+
+```markdown
+# hands-free overrides
+- Default mode: full
+- Auto-commit: on
+- Learning: high
+- <rule description> → <action>
+```
+
+### Available Persistent Settings
+
+| Setting | Example | Effect |
+|---|---|---|
+| `Default mode: <mode>` | `Default mode: full` | Sets the starting mode each session |
+| `Auto-commit: on/off` | `Auto-commit: on` | Enables auto-commit at session start |
+| `Learning: h/m/l` | `Learning: high` | Sets learning sensitivity at session start |
+| `Review checkpoints: on/off` | `Review checkpoints: on` | Enables review checkpoints at session start |
+| `Default loop-aware: on` | `Default loop-aware: on` | Always enter loop-aware mode even without ralph-loop |
+
+### Command-Level Overrides
+
+Override the default classification for specific commands or tools:
+
+```markdown
+# hands-free overrides
+- flyway migrate against localhost dev DB → auto-pass
+- redis-cli connecting to redis.local is local dev → auto-pass
+- npm run deploy:staging → auto-pass (known-safe staging script)
+- notion-move-pages is safe to auto-approve in full mode
+- $BUILD_DIR is always ./build → auto-pass cleanup commands using it
+```
+
+### Tool-Level Overrides
+
+Override MCP tool classifications:
+
+```markdown
+# hands-free overrides
+- notion-fetch, notion-search, notion-get-teams → read (auto-pass in full)
+- notion-create-pages, notion-update-page → write (always ask)
+- my-internal-tool-query → read (auto-pass)
+- my-internal-tool-mutate → write (always ask)
+```
+
+### Pattern Overrides
+
+Override by command pattern (prefix match):
+
+```markdown
+# hands-free overrides
+- kubectl apply -f ./k8s/ → auto-pass in partial (we always review manifests in PRs)
+- psql -h db.internal → auto-pass (db.internal is our local dev Postgres container)
+- git push origin feature/ → auto-pass (feature branches are throwaway)
+```
+
+### Override Precedence
+
+1. Specific CLAUDE.md override → highest (overrides any built-in rule)
+2. Built-in command classification (from this skill's rules)
+3. MCP verb-prefix heuristic → lowest (for unlisted tools only)
+
+A specific override beats a general rule. `npm run deploy:staging → auto-pass` overrides the general "deploy scripts → ask" rule for that exact script only.
+
+### Override Scope
+
+Overrides apply **only to the project** containing the CLAUDE.md. They do not affect other projects or user-global settings. Use `~/.claude/CLAUDE.md` for user-global overrides:
+
+```markdown
+# hands-free overrides (global — applies to all projects)
+- Default mode: full
+- Learning: high
+```
+
+Project-level CLAUDE.md overrides take precedence over user-global CLAUDE.md overrides for conflicting rules.
+
+### Override Annotations
+
+Add a comment explaining why an override exists — future-you will thank present-you:
+
+```markdown
+# hands-free overrides
+# (fly.io proxy is just a local tunnel — safe to skip in full mode)
+- fly proxy → auto-pass
+# (staging DB is a local Docker container, not a real remote)
+- psql -h localhost:5433 → auto-pass
 ```
 
 ---
