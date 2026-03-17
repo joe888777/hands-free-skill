@@ -445,6 +445,14 @@ Note: `git clone <url>` downloads a remote repo but writes only within cwd, maki
 Note: `git commit --amend` (even without `-a`) modifies an existing commit — ask in all modes. This is true even if the commit hasn't been pushed yet.
 Note: `git tag -d <name>` (delete) and `git push --tags` are NOT auto-pass — deletion is destructive, push is remote.
 Note: `git worktree remove <path>` is NOT auto-pass — destructive (removes the worktree directory).
+- `git worktree list` → auto-pass (read-only listing of worktrees)
+- `git worktree prune` → ask (removes stale worktree references — modifies git internals)
+- `git worktree lock <path>` / `git worktree unlock <path>` → ask (modifies worktree lock state)
+- `git submodule status` → auto-pass (read-only status of submodules)
+- `git submodule foreach <cmd>` → classify by the command run in `<cmd>` (same rule as command wrappers)
+- `git submodule update --remote` → ask (fetches from each submodule's remote — network operation)
+- `git submodule deinit <path>` → ask (removes submodule tracking — destructive)
+- `git submodule set-url <path> <url>` → ask (modifies remote URL in `.gitmodules`)
 
 Additional git command behavior (governed by normal mode rules, not always-pass):
 - `git pull` → auto-pass in full mode (fetches from remote + merges/rebases into current branch; local op, but changes working tree and commit history)
@@ -711,6 +719,17 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `disown` → ask (detaches a job from the shell — could make it harder to kill)
   - `wait` / `wait %1` → auto-pass (waits for background job to complete)
 - `sort`, `uniq`, `head`, `tail`, `wc`, `cut`, `tr` on local file input → auto-pass (read-only text processing)
+- **YAML/TOML processing:** `yq '.key' ./config.yaml` → auto-pass (cwd-scoped YAML query, like jq for YAML); `yq -i '.key = "value"' ./config.yaml` → auto-pass (cwd-scoped in-place edit)
+- **Python -m utilities (read-only):** `python -m json.tool ./data.json`, `python -m dis ./script.py`, `python -m timeit "1+1"`, `python -m pydoc <module>`, `python -m calendar`, `python -m base64`, `python -m ast ./script.py` → auto-pass (all cwd-scoped, read-only analysis tools)
+- **Python -m utilities (writes):** `python -m compileall ./src` → auto-pass (cwd-scoped, writes `.pyc` files within the source tree)
+- **Ruby tools:** `bundle install` → auto-pass (cwd-scoped, installs gems from Gemfile.lock); `bundle exec <cmd>` → classify by inner `cmd`; `bundle update` → auto-pass (updates Gemfile.lock); `gem install <gemname>` → ask (writes to system gem path)
+- **Elixir tools:** `mix deps.get` → auto-pass (downloads deps to `_deps/` cwd); `mix compile` → auto-pass (cwd-scoped); `mix test` → auto-pass (cwd-scoped); `mix phx.server` → auto-pass (localhost dev server); `mix ecto.migrate` → auto-pass (cwd-scoped, reads DB_URL from env); `mix ecto.rollback` → ask (destructive migration revert); `mix hex.publish` → ask (publishes to hex.pm — external)
+- **Java/JVM tools:** `mvn compile`, `mvn test`, `mvn verify` → auto-pass (cwd-scoped Maven build); `mvn deploy` → ask (deploys to remote artifact repo); `gradle build`, `gradle test` → auto-pass (cwd-scoped Gradle build); `gradle publish` → ask (publishes to remote); `java -jar ./app.jar` → auto-pass (runs local JAR); `javac ./src/*.java` → auto-pass (cwd-scoped compilation)
+- **openssl extended:**
+  - `openssl s_client -connect example.com:443` → ask (connects to a remote TLS server — network egress)
+  - `openssl verify ./cert.pem` → auto-pass (verifies a local certificate file, cwd-scoped)
+  - `openssl enc -aes-256-cbc -in ./file.txt -out ./file.enc` → auto-pass (cwd-scoped encryption)
+  - `openssl dgst -sha256 ./file.bin` → auto-pass (cwd-scoped hash computation)
 - `diff ./file1 ./file2` / `diff -r ./dir1 ./dir2` → auto-pass (cwd-scoped, read-only comparison)
 - `patch -p1 < ./fix.patch` → auto-pass if the patch file is within cwd (modifies cwd files per patch)
 - `tar czf ./archive.tar.gz ./src/` → auto-pass if both archive and source are within cwd (creates local archive)
