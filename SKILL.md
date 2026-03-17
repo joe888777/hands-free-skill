@@ -448,6 +448,9 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 
 - `pyenv` — any pyenv subcommand (`pyenv install`, `pyenv local`, `pyenv global`, etc.)
 - `nvm` — Node Version Manager (`nvm use`, `nvm install`, `nvm alias`, etc.)
+- `rbenv` / `ruby-build` — Ruby version manager (`rbenv install`, `rbenv local`, `rbenv global`, `rbenv rehash`) → auto-pass (same model as pyenv)
+- `jenv` — Java environment manager (`jenv add`, `jenv local`, `jenv global`) → auto-pass (manages JVM selection; writes only to `~/.jenv/`)
+- `sdkman` (`sdk install`, `sdk use`, `sdk default`, `sdk list`, `sdk current`) → auto-pass (manages JVM/SDK versions; writes to `~/.sdkman/`; considered a version manager, same category as pyenv/nvm)
 - `rustup` — Rust toolchain manager (`rustup update`, `rustup target add`, `rustup component add`, `rustup toolchain install`, etc.)
 - `source .venv/bin/activate` / `. .venv/bin/activate` → auto-pass (activates Python virtual environment — sets env vars in current shell, cwd-scoped)
 - `source ./env.sh` / `. ./env.sh` (cwd-scoped local shell script) → auto-pass in full if the file is within cwd; the content scan rule also applies — if the script contains hard stop patterns, the file cannot be auto-sourced
@@ -1317,6 +1320,56 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `promtool query instant http://localhost:9090 '<query>'` → auto-pass (read-only localhost Prometheus)
   - `promtool query instant http://remote:9090 '<query>'` → ask (remote Prometheus)
   - `datadog-agent status/health` → auto-pass (read-only); `grafana-cli plugins install` → ask (system paths)
+  - `grafana-cli plugins ls` → auto-pass (read-only list of installed Grafana plugins)
+  - `grafana-cli admin reset-admin-password <password>` → ask (modifies Grafana system state)
+- **Kubernetes quality / validation tools:**
+  - `kube-score score ./k8s/deployment.yaml` → auto-pass (cwd-scoped Kubernetes manifest quality scoring; read-only)
+  - `kubeval ./k8s/*.yaml` → auto-pass (cwd-scoped Kubernetes manifest validation; read-only)
+  - `kubesec scan ./k8s/deployment.yaml` → auto-pass (cwd-scoped security risk score; read-only)
+  - `pluto detect-files -d ./k8s/` → auto-pass (cwd-scoped deprecated API detection; read-only)
+  - `conftest test ./k8s/` → auto-pass (cwd-scoped OPA policy tests for manifests; read-only)
+  - `kyverno apply ./policy.yaml --resource ./resource.yaml` → auto-pass (local policy evaluation; no cluster changes)
+- **Service mesh CLIs:**
+  - `istioctl analyze ./k8s/` → auto-pass (cwd-scoped Istio config analysis; read-only)
+  - `istioctl validate -f ./istio-config.yaml` → auto-pass (cwd-scoped; read-only)
+  - `istioctl x precheck` → ask (connects to a cluster to check upgrade readiness)
+  - `istioctl install` → ask (installs Istio into a cluster — remote cluster state change)
+  - `linkerd check --pre` → ask (connects to cluster to check install readiness)
+  - `linkerd install --crds | kubectl apply -f -` → ask (installs Linkerd CRDs into cluster)
+  - `linkerd jaeger check` → ask (connects to cluster)
+- **Code coverage CLI tools:**
+  - `coverage run -m pytest ./tests/` → auto-pass (cwd-scoped; runs tests and collects Python coverage data)
+  - `coverage report` / `coverage html` / `coverage xml` → auto-pass (generates coverage report from existing data; cwd-scoped)
+  - `coverage erase` → auto-pass (clears `.coverage` data file in cwd; cwd-scoped)
+  - `npx nyc mocha` / `npx c8 mocha` → auto-pass (cwd-scoped; JS code coverage runners)
+  - `npx nyc report --reporter=html` → auto-pass (generates HTML coverage report; cwd-scoped)
+  - `lcov --capture --directory . --output-file ./coverage.info` → auto-pass (cwd-scoped LCOV data capture)
+  - `genhtml ./coverage.info --output-directory ./coverage/` → auto-pass (cwd-scoped; generates HTML from LCOV data)
+  - `go test -coverprofile=./coverage.out ./...` → auto-pass (cwd-scoped Go coverage run)
+  - `go tool cover -html=./coverage.out -o ./coverage.html` → auto-pass (cwd-scoped; generates HTML from Go coverage)
+- **Outdated dependency checkers (read-only):**
+  - `npm outdated` / `yarn outdated` / `pnpm outdated` → auto-pass (read-only: shows packages with newer versions available)
+  - `cargo outdated` → auto-pass (read-only; checks Cargo.lock against latest registry versions)
+  - `bundle outdated` → auto-pass (read-only; shows outdated gems from Gemfile.lock)
+  - `gem outdated` → auto-pass (read-only; shows outdated system gems)
+  - `pip list --outdated` / `pip list -o` → auto-pass (read-only; shows outdated installed packages)
+  - `composer outdated` → auto-pass (read-only PHP dependency staleness check)
+  - `go list -u -m all` → auto-pass (read-only; lists modules with available upgrades)
+  - Note: outdated checkers only **report** stale versions — no package manager writes. All are auto-pass.
+- **Process supervisor (supervisord/supervisorctl):**
+  - `supervisorctl status` → auto-pass (read-only: shows status of all managed processes)
+  - `supervisorctl start <name>` / `supervisorctl stop <name>` / `supervisorctl restart <name>` → ask (modifies running process state — system-level side effects)
+  - `supervisorctl reload` / `supervisorctl reread` → ask (reloads supervisor config — may start/stop managed processes)
+  - `supervisord -c ./supervisord.conf` → auto-pass (starts supervisor from cwd config file; local daemon)
+  - `supervisord -n -c ./supervisord.conf` → auto-pass (foreground mode; cwd-scoped config)
+- **Shell scripting utilities:**
+  - `shfmt ./scripts/deploy.sh` → auto-pass (read-only: formats shell script and prints to stdout)
+  - `shfmt -w ./scripts/deploy.sh` → auto-pass (cwd-scoped in-place format; non-destructive to functionality)
+  - `shfmt -d ./scripts/` → auto-pass (diff mode: shows what would change; read-only)
+  - `shellcheck ./scripts/run.sh` → auto-pass (cwd-scoped shell script linter; read-only)
+  - `shellcheck --exclude SC2086 ./scripts/*.sh` → auto-pass (cwd-scoped with rule exclusions)
+  - `envsubst < ./templates/config.yaml.tmpl > ./config.yaml` → auto-pass (substitutes env vars in cwd template, writes to cwd; read of template + env vars only)
+  - `envsubst '${VAR1} ${VAR2}' < ./template.txt` → auto-pass (scoped substitution; cwd output)
 - **Linear CLI:**
   - `linear issue list/view` → auto-pass (read-only); `linear issue create/pr merge` → ask (external shared state)
 - **gRPC tooling:**
