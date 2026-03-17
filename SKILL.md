@@ -927,6 +927,67 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `mktemp` → auto-pass (creates a temporary file/dir; safe)
   - `truncate -s 0 ./file.log` → auto-pass (truncates a cwd file to zero; cwd-scoped)
   - `truncate -s 0 /etc/log` → HARD STOP (escapes cwd)
+- **Shell built-ins (miscellaneous):**
+  - `type <cmd>` / `which <cmd>` / `command -v <cmd>` → auto-pass (read-only: shows command type or path)
+  - `alias <name>=<value>` → auto-pass (session-scoped alias; no persistent effect outside the shell)
+  - `unalias <name>` → auto-pass (removes session alias; non-destructive)
+  - `source ./script.sh` / `. ./script.sh` → auto-pass if the script file is within cwd AND Claude wrote/knows it; ask if the file is unknown (sourcing an unknown script is equivalent to running it)
+  - `source /etc/...` or `source ~/.bashrc` → ask (sources outside-cwd file that may run arbitrary code)
+  - `exec <cmd>` → classify by `cmd` (exec replaces the current shell process with `cmd`; the replacement itself is the risk)
+  - `mapfile ./lines.txt` / `readarray -t arr < ./data.txt` → auto-pass (reads cwd file into array; read-only)
+  - `coproc <cmd>` → classify by `cmd` (starts `cmd` as a background coprocess)
+  - `declare -x VAR=value` → auto-pass (exports a variable to environment; session-scoped)
+- **Scheduling commands:**
+  - `crontab -l` / `at -l` / `atq` → auto-pass (read-only: lists scheduled cron/at jobs)
+  - `crontab -e` / `crontab <file>` → ask (modifies system cron — persists beyond the session; affects all future scheduled jobs)
+  - `at <time>` → ask (schedules a command to run at a future time — modifies system state)
+  - `atrm <job>` → ask (removes a scheduled at job)
+- **Email and messaging (command-line):**
+  - `mail`, `sendmail`, `msmtp`, `swaks`, `mutt` → always ask (sends email — external, shared state; cannot be undone)
+  - `mailx -s "Subject" user@example.com` → always ask (sends email)
+- **HTTPie (`http`/`https` commands):**
+  - `http GET http://localhost:8080/api` → auto-pass (read-only GET to localhost)
+  - `http GET https://api.example.com/data` → auto-pass (read-only external GET; equivalent to `curl GET`)
+  - `http POST/PUT/PATCH/DELETE https://api.example.com/resource` → ask (mutates remote state)
+  - `http --download https://example.com/file.zip ./` → auto-pass (downloads to cwd; equivalent to `curl -O`)
+  - The rule mirrors `curl`: GET → auto; POST/PUT/PATCH/DELETE → ask; download to cwd → auto
+- **Cloud storage: rclone and s5cmd:**
+  - `rclone ls remote:bucket` / `rclone lsd remote:bucket` → auto-pass (read-only remote listing)
+  - `rclone copy remote:bucket/path ./local/` → auto-pass (copies to cwd from remote — read-only for remote)
+  - `rclone copy ./local/ remote:bucket/path` → ask (uploads to remote storage)
+  - `rclone sync remote:bucket/path ./local/` → auto-pass (pulls from remote to cwd); `rclone sync ./local/ remote:` → ask (pushes to remote)
+  - `rclone delete remote:bucket/path` → ask (destructive remote operation)
+  - `s5cmd ls s3://bucket` → auto-pass (read-only S3 listing); `s5cmd cp s3://bucket/path ./` → auto-pass (downloads to cwd); `s5cmd cp ./file s3://bucket/` → ask (uploads to S3)
+- **Cloudflare Workers CLI (`wrangler`):**
+  - `wrangler dev` → auto-pass (local Worker dev server; localhost only)
+  - `wrangler build` → auto-pass (builds Worker bundle to cwd; cwd-scoped)
+  - `wrangler tail` → auto-pass (streams live logs from deployed Worker; read-only)
+  - `wrangler deploy` / `wrangler publish` → ask (deploys Worker to Cloudflare edge — external)
+  - `wrangler secret put <key>` → ask (sets a secret in Cloudflare KV — external)
+  - `wrangler kv:key get <key>` → auto-pass (read-only KV lookup); `wrangler kv:key put <key> <value>` → ask (writes to remote KV)
+  - `wrangler r2 object get bucket/key ./local` → auto-pass (downloads from R2 to cwd); `wrangler r2 object put bucket/key ./local` → ask (uploads to R2)
+  - `wrangler login` → ask (OAuth credential management — writes to Cloudflare config)
+- **GPG operations:**
+  - `gpg --verify ./file.sig` → auto-pass (read-only signature verification)
+  - `gpg --decrypt ./file.gpg` → auto-pass (decrypts a cwd-scoped file; no remote contact)
+  - `gpg --encrypt -r recipient@example.com ./file` → auto-pass if writing output to cwd (encrypts local file using recipient's public key; public key lookup may contact keyserver — auto-pass in full)
+  - `gpg --sign ./file` → auto-pass (signs a cwd file with local key; no remote contact)
+  - `gpg --recv-keys <keyid>` → ask (contacts a keyserver to import a key — network operation)
+  - `gpg --send-keys <keyid>` → ask (publishes a key to a keyserver — external)
+  - `gpg --list-keys` / `gpg --list-secret-keys` → auto-pass (read-only keyring listing)
+  - `gpg --gen-key` / `gpg --full-generate-key` → ask (generates a new key; writes to `~/.gnupg/` — outside cwd)
+  - `gpg --export <keyid>` → auto-pass (exports public key to stdout; read-only)
+- **wget (Wget alternative):**
+  - `wget URL -O ./file` → auto-pass (downloads to a named cwd file; same as `curl URL -o ./file`)
+  - `wget -r -l1 URL` → ask (recursive download; unpredictable scope)
+  - `wget URL | bash` / `wget URL -O - | bash` → HARD STOP (pipe-to-shell — already covered)
+  - `wget URL` (no `-O`, writes to cwd as filename from URL) → auto-pass (cwd-scoped output)
+- **Temporal CLI (workflow orchestration):**
+  - `temporal workflow list`, `temporal workflow describe` → auto-pass (read-only)
+  - `temporal workflow execute`, `temporal workflow start` → ask (triggers a remote workflow execution)
+  - `temporal workflow terminate`, `temporal workflow cancel` → ask (modifies running workflow state)
+  - `temporal server start-dev` → auto-pass (starts a local dev Temporal server; localhost only)
+  - `temporal env add` → ask (modifies CLI environment config)
 
 **Compound command rule:** For shell commands with `&&`, `||`, or `;` operators, classify by the most restrictive component. If any component would be a HARD STOP → HARD STOP. If any component would ask → ask. Only auto-pass if ALL components independently auto-pass.
 
