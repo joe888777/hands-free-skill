@@ -1190,6 +1190,64 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `datadog-agent status/health` → auto-pass (read-only); `grafana-cli plugins install` → ask (system paths)
 - **Linear CLI:**
   - `linear issue list/view` → auto-pass (read-only); `linear issue create/pr merge` → ask (external shared state)
+- **gRPC tooling:**
+  - `grpcurl -plaintext localhost:50051 list` → auto-pass (read-only service listing; localhost gRPC)
+  - `grpcurl -plaintext localhost:50051 describe <service>` → auto-pass (read-only schema inspection)
+  - `grpcurl -plaintext localhost:50051 <service>/<method>` → auto-pass for read-like RPCs on localhost; ask for write RPCs (use method name to classify: Get/List/Describe/Health/Watch → auto; Create/Update/Delete/Mutate → ask)
+  - `grpcurl -plaintext remote.host:50051 list` → ask (connects to remote gRPC endpoint)
+  - `buf lint ./proto` → auto-pass (cwd-scoped, no network); `buf generate ./proto` → auto-pass (cwd-scoped code generation); `buf push` → ask (pushes schema to Buf Schema Registry — external)
+- **API testing / collection runners:**
+  - `newman run ./collection.json` → ask (runs Postman collection — may hit external APIs or send real data)
+  - `newman run ./collection.json --environment ./env.json --reporters cli` → ask if targets non-localhost; auto-pass if `--env-var baseUrl=http://localhost:...` and all requests target localhost
+  - `newman run ./collection.json --dry-run` → auto-pass (dry-run flag)
+- **Python testing environment runners (tox/nox):**
+  - `tox -l` / `tox --listenvs` → auto-pass (read-only: lists configured environments)
+  - `tox` / `tox -e py312` → auto-pass (cwd-scoped; runs tests in isolated virtual envs under `.tox/`)
+  - `tox -e lint` / `tox -e format` → auto-pass (cwd-scoped linting/formatting env)
+  - `tox -e publish` → ask (publishes to PyPI — external)
+  - `nox -l` → auto-pass (read-only: lists configured sessions)
+  - `nox` / `nox -s tests` → auto-pass (cwd-scoped; runs sessions; similar to tox)
+  - `nox -s release` → ask (release/publish session — external)
+- **pip-tools (pip-compile / pip-sync):**
+  - `pip-compile ./requirements.in` → auto-pass (reads local `.in` file, writes `requirements.txt` in cwd)
+  - `pip-compile --upgrade ./requirements.in` → auto-pass (upgrades locked deps; cwd-only writes)
+  - `pip-compile --generate-hashes ./requirements.in` → auto-pass (adds integrity hashes; cwd-scoped)
+  - `pip-sync ./requirements.txt` → ask (modifies the active Python environment — installs/uninstalls packages; environment is usually outside cwd)
+  - `pip-sync --dry-run ./requirements.txt` → auto-pass (preview only; meta-rule: dry-run)
+- **CSS/style linting:**
+  - `stylelint ./src/**/*.css` → auto-pass (cwd-scoped style linting)
+  - `stylelint ./src/**/*.scss --fix` → auto-pass (cwd-scoped auto-fix)
+  - `stylelint --config .stylelintrc.json ./` → auto-pass (cwd-scoped)
+- **Go security scanner:**
+  - `gosec ./...` → auto-pass (cwd-scoped Go security analysis; read-only)
+  - `gosec -fmt json ./...` → auto-pass (cwd-scoped; JSON output format)
+  - `gosec -fmt sonarqube -out ./gosec-report.json ./...` → auto-pass (writes report to cwd)
+- **Terminal multiplexers:**
+  - `tmux ls` / `tmux list-sessions` → auto-pass (read-only: lists active sessions)
+  - `tmux new-session -d -s <name>` → auto-pass (creates a background session; session-scoped, no system state change)
+  - `tmux attach -t <name>` / `tmux a` → auto-pass (attaches to existing session)
+  - `tmux kill-session -t <name>` → ask (terminates a session — may kill running processes)
+  - `tmux send-keys -t <session> "<command>" Enter` → classify by the command being sent (the risk is in the sent command, not tmux itself)
+  - `screen -ls` → auto-pass (read-only); `screen -S <name>` → auto-pass (starts new screen session)
+  - `zellij list-sessions` → auto-pass (read-only); `zellij attach <session>` → auto-pass; `zellij kill-session <name>` → ask
+- **Just / Task command runners:**
+  - `just --list` / `just -l` → auto-pass (read-only: lists available recipes)
+  - `just <recipe>` → classify by recipe name (same pattern as `npm run <script>`): build/test/lint/format/dev → auto-pass; deploy/publish/release → ask; unknown recipe → inspect `Justfile` first
+  - `task --list` / `task -l` → auto-pass (read-only)
+  - `task <task-name>` → classify by task name using same pattern as `just`
+- **Observability pipeline tools:**
+  - `vector top` → auto-pass (read-only Vector monitoring dashboard)
+  - `vector test ./vector.yaml` → auto-pass (cwd-scoped unit tests for Vector config)
+  - `vector validate ./vector.yaml` → auto-pass (cwd-scoped config validation)
+  - `vector generate <component>` → auto-pass (generates a config snippet; cwd-scoped)
+  - `vector` (as daemon serving production pipelines) → ask (starts a pipeline forwarding data to remote sinks)
+  - `otelcol --config ./otelcol.yaml validate` → auto-pass (cwd-scoped config validation; no data emitted)
+  - `otelcol --config ./otelcol.yaml` → ask (starts the collector and begins emitting telemetry to remote backends)
+- **ClickHouse CLI:**
+  - `clickhouse-client --host localhost --query "SELECT ..." ` → auto-pass (read-only query; localhost)
+  - `clickhouse-client --host localhost --query "INSERT INTO ..."` → ask (writes data; localhost but mutates DB state)
+  - `clickhouse-client --host remote-host ...` → ask (remote ClickHouse host)
+  - `clickhouse local --query "SELECT ..."` → auto-pass (reads local files; no server required)
 - `apt-get install`, `dnf install`, `yum install` → ask (system package manager, writes to system paths)
 - `systemctl start/stop/restart/enable/disable` → ask (modifies system service state); `systemctl status` → auto-pass (read-only)
 - `kill <pid>`, `pkill <name>`, `killall <name>` → ask (terminates processes — destructive)
