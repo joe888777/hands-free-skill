@@ -1254,7 +1254,17 @@ When enabled (`/hands-free auto-commit on`), automatically commit changes at nat
 
 1. Stage only the relevant changed files (`git add <specific files>`) — never `git add -A` or `git add .`. "Relevant files" = files that were modified as part of the current task being committed; determined by tracking which files Claude edited or created during the current task. Do NOT stage: files you don't know the purpose of, files still under active work, or files that belong to a different logical unit.
 2. Determine commit message style: run `git log --oneline -5` to see recent messages; match the format (e.g., if repo uses `feat:` / `fix:` prefixes, use those; if it uses plain sentences, match that). If the repo has no prior commits (empty history), use the `feat:` / `fix:` conventional commits format as the default style.
-3. Write a concise commit message following that style
+3. Infer commit message from what changed:
+   - **Type prefix** (if using conventional commits): `feat:` for new capability, `fix:` for bug fix, `refactor:` for code restructuring without behavior change, `test:` for test-only changes, `docs:` for doc-only changes, `chore:` for tooling/config, `style:` for formatting-only, `perf:` for performance improvement
+   - **What changed**: scan the staged files and their diffs to extract the subject:
+     - New file added → `feat: add <filename/feature>`
+     - Function/class/method added → `feat: add <function name>` or `feat: implement <class name>`
+     - Bug fixed in specific function → `fix: <describe the bug fixed>`
+     - Existing logic changed → `refactor: <describe the refactor>`
+     - Test file added/changed → `test: add tests for <component>`
+     - Migration file added → `feat: add migration for <table/column>`
+   - **Scope** (if the repo uses `feat(scope):` format, infer scope from the file path or module name)
+   - **Message length**: keep under 72 characters; omit articles ("a", "the") to save space
 4. Announce: "Auto-committed: `<short message>`"
 5. Log it in the session log
 
