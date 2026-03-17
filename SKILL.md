@@ -174,6 +174,12 @@ If a skill presents options but marks none as recommended:
 
 Do NOT pause indefinitely just because no recommendation exists. Make a decision, announce it, and continue.
 
+**Explicitly "NOT recommended" options:** If an option is explicitly labeled "not recommended" or "avoid this" (not just unlabeled), treat all other options as the candidate set. If there is only one remaining candidate, auto-pick it. If multiple candidates remain, apply normal "no recommendation" rules (preference → first-listed).
+
+Examples:
+- "Option A / Option B (not recommended for production)" → Option A is the candidate → auto-pick Option A
+- "Option A (not recommended) / Option B / Option C" → B and C are candidates → apply preference or first-listed (B)
+
 ### Custom Skill Integration
 
 Hands-free works with any skill that presents approval points, not just superpowers. For custom skills, hands-free recognizes these patterns as approval points:
@@ -323,6 +329,13 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `git submodule add <url>` → auto-pass in full (adds submodule to cwd, non-destructive); ask in partial (execution-type decision)
 - Cloud storage CLIs writing to remote buckets → ask (remote state, not within `./`): `aws s3 cp`/`sync`/`rm`, `gsutil cp`/`rsync`/`rm`, `az storage blob upload`; cloud read commands (`aws s3 ls`, `gsutil ls`) → auto-pass (read-only)
 - `nc`/`netcat` connecting to a remote host → ask; `nc -l` listening locally → auto-pass (local, user can disconnect)
+
+**Compound command rule:** For shell commands with `&&`, `||`, or `;` operators, classify by the most restrictive component. If any component would be a HARD STOP → HARD STOP. If any component would ask → ask. Only auto-pass if ALL components independently auto-pass.
+
+Examples:
+- `cargo fmt && cargo test` → auto-pass (both are cwd-scoped auto-pass)
+- `cargo test && git push` → ask (git push requires user confirmation)
+- `curl ... | bash` → HARD STOP (regardless of other components)
 
 **Env-var prefix rule:** A command of the form `KEY=value cmd arg...` is classified by its underlying `cmd`, not by the env var prefix. `DATABASE_URL=postgresql://localhost cargo test` → auto-pass (cargo test is cwd-scoped). `API_KEY=secret curl https://api.example.com/upload` → ask (escapes cwd). The env var prefix does not change the classification.
 
@@ -851,6 +864,22 @@ Why:
   Cannot be overridden or promoted to auto-accept
 
 To install the tool safely: download first with curl -o ./tool.sh, review the file, then run it
+```
+
+**Learned preference (applied silently):**
+```
+/hands-free explain
+
+Last decision: [auto-accept] [brainstorming] "simplest approach"
+
+Why:
+  Skill presented 3 approaches: "simplest", "modular", "microservices"
+  No recommendation was marked by the skill
+  Learned preference matched: brainstorming-approaches → "simplest approach" (5x, high confidence)
+  Learning sensitivity: high → applied silently without announcement
+
+Source: preferences.md line 4
+Override: type /hands-free off and re-run, or use /hands-free reset to clear this preference
 ```
 
 If no decision has been made in this session: `No auto-accept or hard-stop decisions have been recorded this session.`
