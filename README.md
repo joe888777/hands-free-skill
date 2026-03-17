@@ -254,7 +254,7 @@ Hands-free enforces **universal hard stops** in ALL modes, including `crazy-work
 | Pattern | Why |
 |---|---|
 | `curl \| bash`, `wget \| sh`, `eval $(curl ...)`, `source <(curl ...)` | Remote code execution — arbitrary code from the internet |
-| `python -c "exec(urllib...)"`, `node -e "eval(require...)"` | Language-level RCE — fetches and executes remote code via interpreter |
+| `python -c "exec(urllib...)"`, `node -e "eval(require...)"`, `deno run https://...` | Language-level RCE — fetches and executes remote code via interpreter |
 | `chmod 777`, `chmod a+rwx` | World-writable permissions — any user can modify the file |
 | Secrets in staged files | Prevent accidentally committing API keys, private keys, tokens |
 | `rm -rf *` | Indiscriminate wipe — deletes everything in scope |
@@ -284,9 +284,11 @@ CLAUDE.md instructions take precedence over global `preferences.md` rules.
 
 **Security:**
 - Root shell escalation hard stop: `sudo -s`, `sudo su`, `sudo bash` now blocked in all modes
+- Language RCE expanded: `deno run <url>`, `perl` fetch-then-eval patterns added to universal hard stops
 - Global install detection: `npm install -g`, `cargo install`, `pip install` (no venv) → ask
 - Docker volume mount rules: `-v ./:/app` auto-pass; `-v /:/host` ask
-- Package publish/deploy hard stops: `cargo publish`, `npm publish`, `docker push`, `vercel deploy` → ask
+- Package publish/deploy hard stops: `cargo publish`, `npm publish`, `docker push`, `vercel deploy`, `docker compose push`, `terraform apply/destroy` → ask
+- Secrets detection expanded: `.npmrc`, `*.cer/*.der/*.crt`, `database_url=`, `signing_key=`, hardcoded auth headers
 
 **Commands:**
 - `/hands-free` with no argument: activates full mode or shows status if already active
@@ -295,17 +297,22 @@ CLAUDE.md instructions take precedence over global `preferences.md` rules.
 - `/hands-free explain` now covers hard stops, not just auto-accepts
 
 **Shell auto-pass:**
-- Git: `git checkout -b`, `git branch`, `git stash/pop`, `git log/status/diff` added to always-auto-pass
+- Git: `git checkout -b`, `git branch`, `git stash/pop`, `git log/status/diff`, `git tag`, `git commit` (non-amend), `git worktree add` added to always-auto-pass
 - Version managers: `nvm`, `rustup` added alongside `pyenv`
-- Package managers: `pnpm`, `yarn` added alongside `npm`
+- Package managers: `pnpm`, `yarn`, `bun` added alongside `npm`
 - Databases: `sqlx migrate`, `alembic upgrade`, `npx prisma migrate`, `django manage.py migrate`
 - More languages: Python type checking (mypy, ruff), Rust formatting (cargo fmt), Bun
+- Docker Compose: `docker compose up/build/down/run` → auto-pass; `docker compose push` → ask
+- Build tools: `make test/build` → auto-pass; `make install` → ask (may write to system)
+- Infrastructure: `terraform plan` → auto-pass (read-only); `terraform apply/destroy` → ask
+- Quality tools: `pre-commit run --all-files` → auto-pass
 
 **Behavior:**
 - Mode persistence: resets at session end; persist via CLAUDE.md `Default mode:` directive
 - CLAUDE.md `Default mode/Auto-commit/Learning` directives activate at session start automatically
 - Announcement format defined for all decision sources (silent, announce, hard stop)
 - Custom skill implicit recommendation detection ("I recommend...", "I suggest...")
+- Custom skill execution-type vs design-type classification for partial mode
 - Loop stall prevention: 3 iterations with no new progress triggers stall warning
 
 **Reliability:**
