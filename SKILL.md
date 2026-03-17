@@ -480,6 +480,7 @@ Additional git command behavior (governed by normal mode rules, not always-pass)
 - `git rebase -i` / `git rebase --interactive` → ask in all modes (interactive history rewrite)
 - `git filter-branch`, `git filter-repo` → ask in all modes (mass commit history rewrite — irreversible without backup)
 - `git bisect start`, `git bisect good`, `git bisect bad`, `git bisect reset` → auto-pass in full (debugging tool; bisect run is non-destructive read-only; bisect reset returns to HEAD)
+- `git bisect run <script>` → auto-pass if script is cwd-scoped (automated bisect; classify by the script being run — if `./test.sh` auto-passes, `git bisect run ./test.sh` auto-passes); ask if the script escapes cwd or is a remote fetch
 - `cd` within the workspace — changing into any subdirectory of the current workspace
 - `cargo nextest run` / `cargo nextest run --workspace` — next-generation Rust test runner (cwd-scoped, replaces `cargo test`)
 - `cargo metadata --format-version 1` → auto-pass (read-only JSON metadata about the workspace)
@@ -776,6 +777,26 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `apt-get install`, `dnf install`, `yum install` → ask (system package manager, writes to system paths)
 - `systemctl start/stop/restart/enable/disable` → ask (modifies system service state); `systemctl status` → auto-pass (read-only)
 - `kill <pid>`, `pkill <name>`, `killall <name>` → ask (terminates processes — destructive)
+- **Docker registry authentication:**
+  - `docker login registry.example.com` → ask (sends credentials to remote registry; writes to `~/.docker/config.json`)
+  - `docker logout` → ask (removes credentials — could break subsequent pushes)
+  - `cat ./token | docker login --username user --password-stdin registry.example.com` → ask (same as docker login; reading token from cwd is fine but the login itself sends to remote)
+- **Environment file loading wrappers:**
+  - `cross-env NODE_ENV=test npx jest` → auto-pass (env-var prefix rule; jest is cwd-scoped)
+  - `env-cmd -f ./.env npx jest` → auto-pass (loads local `.env`, then jest is cwd-scoped; content scan applies to the .env file before use)
+  - `dotenv npx jest` → auto-pass (same pattern)
+  - `dotenv -e ./.env.test npx jest` → auto-pass (cwd-scoped env file)
+  - Note: these are wrapper commands; classify by the underlying command they execute
+- **File system watchers:**
+  - `fswatch -r ./src` → auto-pass (read-only monitoring of cwd directory)
+  - `inotifywait -r ./src` → auto-pass (read-only inotify monitoring; Linux-only)
+  - `watchman watch ./src` → auto-pass (read-only file system event trigger; Watchman daemon)
+  - `entr -r sh -c "cargo test"` → auto-pass if the triggered command auto-passes (entr runs a command on file change; classify by the triggered command)
+- **Low-level disk operations:**
+  - `dd` → ask (always; low-level block device copy can be catastrophic; even `dd if=./file of=./output` can overwrite critical files)
+  - `mktemp` → auto-pass (creates a temporary file/dir; safe)
+  - `truncate -s 0 ./file.log` → auto-pass (truncates a cwd file to zero; cwd-scoped)
+  - `truncate -s 0 /etc/log` → HARD STOP (escapes cwd)
 
 **Compound command rule:** For shell commands with `&&`, `||`, or `;` operators, classify by the most restrictive component. If any component would be a HARD STOP → HARD STOP. If any component would ask → ask. Only auto-pass if ALL components independently auto-pass.
 
