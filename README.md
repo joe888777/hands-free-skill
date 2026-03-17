@@ -7,9 +7,11 @@ A Claude Code skill that auto-accepts recommended options from any skill workflo
 - **Auto-accepts** recommended options at approval points (brainstorming, design, execution, checkpoints)
 - **Auto-commits** changes at natural milestones with clean git history
 - **Pauses** for destructive/irreversible actions (git push, merge, discard, force operations, rm -rf, CI/CD changes, etc.)
+- **Blocks** pipe-to-shell (`curl | bash`), privilege escalation (`chmod 777`), and secrets in commits — always, in every mode
+- **Review checkpoints** — structured pause-and-summarize before costly phase transitions (optional, or always-on in `partial`)
 - **Learns** your preferences over time — tracks choices, builds confidence, adapts to you
 - **Ralph-loop integration** — works with ralph-loop + superpowers for fully autonomous iterative development
-- **Three modes** — `full`, `partial`, and `off` for different levels of autonomy
+- **Four modes** — `full`, `partial`, `off`, and `crazy-workspace` for different levels of autonomy
 
 ## Install
 
@@ -40,6 +42,7 @@ cp -r autopilot-skill ~/.claude/skills/hands-free
 /hands-free review-checkpoints on # Pause at phase transitions for review
 /hands-free learning <h/m/l>      # Set learning sensitivity (high/medium/low)
 /hands-free dry-run               # Preview what would be auto-accepted
+/hands-free reset                 # Clear all learned preferences (requires confirmation)
 /hands-free status                # Show current mode + all settings
 /hands-free recommend             # Suggest optimal settings
 /hands-free log                   # Show session decisions

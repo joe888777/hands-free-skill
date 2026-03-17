@@ -22,15 +22,28 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free learning <h/m/l>  # set learning sensitivity
 /hands-free dry-run      # preview what hands-free would auto-accept right now
 /hands-free recommend    # show recommended settings based on usage
+/hands-free reset        # clear all learned preferences (requires confirmation)
 /hands-free log          # show session decisions
 /hands-free status       # show current mode + all settings
 ```
 
 ## Recommended Setup
 
-> `/hands-free full` + `/hands-free learning high`
->
-> Best for experienced users who trust the defaults and want maximum speed. Auto-accepts everything non-destructive, learns your preferences after a single choice.
+| Use case | Recommended config |
+|---|---|
+| Maximum speed, trusted environment | `/hands-free full` + `learning high` + `auto-commit on` |
+| Maximum speed + ralph-loop | above + `/hands-free crazy-workspace` |
+| Speed with phase-transition safety | `/hands-free full` + `review-checkpoints on` |
+| Careful, review before execution | `/hands-free partial` (review-checkpoints always on) |
+| First-time / unfamiliar codebase | `/hands-free off` (observe only, learn preferences) |
+
+> **Quick start (most users):**
+> ```
+> /hands-free full
+> /hands-free learning high
+> /hands-free auto-commit on
+> ```
+> Auto-accepts everything non-destructive, learns your preferences after a single choice, commits at natural milestones.
 
 ## Mode Behavior
 
@@ -60,9 +73,34 @@ Auto-accept recommended options from any skill without pausing. Works with super
 
 Mode and learning can be combined: `/hands-free full` then `/hands-free learning high`. **Learning thresholds govern when preferences are recorded and applied; mode governs what gets auto-accepted when no preference exists.** They are independent axes.
 
+### Mode Transitions
+
+Switching modes mid-session takes effect immediately for all future approval points. Decisions already made in the previous mode are not retroactively changed.
+
+| Transition | Behavior |
+|---|---|
+| `off` → `full` | Start auto-accepting from the next approval point |
+| `full` → `partial` | Next execution-type approval point will pause instead of auto-accepting |
+| `full` → `off` | All future approvals require user input |
+| any → `crazy-workspace` | Announce activation warning; all operations in `./` auto-accepted from next action |
+| `crazy-workspace` → any | Revert to normal mode rules immediately; no residual auto-approvals |
+
+**`review-checkpoints` follows the mode on transitions:** switching to `partial` turns review-checkpoints on automatically; switching to `full` or `crazy-workspace` turns them off (unless explicitly set with `/hands-free review-checkpoints on`).
+
 ## Core Rule
 
 When active, MUST auto-proceed with the recommended option. Do NOT pause, present options, or wait. **Announce, don't ask:** "Going with approach 2 (recommended) — [reason]" and continue.
+
+### Conflict Resolution
+
+When two active skills both present approval points simultaneously, apply this priority order:
+
+1. **Hard stop always wins** — if either skill's approval point is a hard stop, pause and ask regardless of the other skill's behavior
+2. **More restrictive mode wins** — if one skill says "pause" and another says "auto", pause
+3. **HARD STOP beats review checkpoint** — a review checkpoint that would pause still defers to a hard stop (same outcome, but framed as a hard stop)
+4. **User preference overrides both** — if a learned preference covers this decision point, it wins over any skill's default
+
+If genuinely ambiguous (two skills both say "ask" for different reasons), surface both questions to the user in a single prompt rather than asking twice.
 
 Applies to **any skill** — not just superpowers:
 - Options with recommendation → pick it
@@ -376,9 +414,29 @@ Hands-Free Session Log (full, learning: high)
   [brainstorming] approach 2 (recommended)
   [brainstorming] design approved (3 sections)
   [writing-plans] subagent-driven (your preference)
+  [review-checkpoint] writing-plans → executing-plans — user chose [C] Continue
   [executing-plans] batches 1-3 auto-continued
+  [auto-commit] feat: add validation to form (2 files)
+  [review-checkpoint] executing-plans → verification — skipped (review-checkpoints off)
+  [verification] passed — proceeding to finishing-branch
+  [review-checkpoint] verification → finishing-branch — HARD STOP (mandatory)
   [finishing-branch] PAUSED — git push → user approved
 ```
+
+Events logged: `[brainstorming]`, `[writing-plans]`, `[executing-plans]`, `[verification]`, `[finishing-branch]`, `[auto-commit]`, `[review-checkpoint]`, `[systematic-debugging]`, `[hard-stop]`, `[user-override]`.
+
+## `/hands-free reset`
+
+When invoked, clear all learned preferences from `preferences.md`. Always prompts for confirmation regardless of mode — this is a destructive operation and cannot be auto-accepted.
+
+```
+/hands-free reset
+
+This will clear all learned preferences (N rules, M observations).
+Type "confirm" to proceed or anything else to cancel: _
+```
+
+After confirmation, wipe `preferences.md` to its empty scaffold and announce: `Preferences cleared. Hands-free will use defaults until new preferences are learned.`
 
 ## Ralph Loop Integration
 
@@ -489,9 +547,12 @@ The "1 remaining" pause is the only mandatory pause the warning system introduce
 ### Behavior
 
 - **Auto-approve everything under `./`** — git push, merges, resets, force ops, destructive edits, file deletions, package changes, CI changes — all auto-accepted
-- **Two absolute hard stops** (no exceptions, no override):
+- **Absolute hard stops** (no exceptions, no override, even in crazy-workspace):
   - `rm -rf *` — wipes everything indiscriminately
   - `rm -rf .git` — destroys version history
+  - Pipe-to-shell patterns (`curl | bash`, `wget | sh`, `eval $(curl ...)`, etc.)
+  - Privilege escalation (`chmod 777`, `chmod a+rwx`, `sudo` to system paths)
+  - Secrets detected in staged files (pre-commit secrets scan always runs)
 - Operations targeting paths **outside `./`** → HARD STOP and ask
 
 ### Announce on Activation
@@ -501,16 +562,16 @@ When crazy-workspace is activated, print a clear warning:
 ```
 Crazy-Workspace ACTIVE — scope: ./
 Auto-approving all operations within this directory.
-Hard stops: rm -rf * | rm -rf .git
+Hard stops: rm -rf * | rm -rf .git | curl|bash | chmod 777 | secrets-in-commit | paths outside ./
 ```
 
 ### Decision Flow
 
 ```dot
 digraph {
-    "Action requested" -> "rm -rf * or rm -rf .git?";
-    "rm -rf * or rm -rf .git?" -> "HARD STOP" [label="yes"];
-    "rm -rf * or rm -rf .git?" -> "Within ./?";
+    "Action requested" -> "Absolute hard stop? (rm -rf *, rm -rf .git, curl|bash, chmod 777, secrets)";
+    "Absolute hard stop? (rm -rf *, rm -rf .git, curl|bash, chmod 777, secrets)" -> "HARD STOP" [label="yes"];
+    "Absolute hard stop? (rm -rf *, rm -rf .git, curl|bash, chmod 777, secrets)" -> "Within ./?";
     "Within ./?" -> "Auto-approve" [label="yes"];
     "Within ./?" -> "HARD STOP" [label="no — escapes scope"];
 }
@@ -520,13 +581,15 @@ digraph {
 
 ## HARD STOP — Always Pause
 
-Applies in ALL modes (including crazy-workspace). Never auto-accept:
+Two tiers of hard stops:
+- **Universal** — blocked in ALL modes including crazy-workspace (no exceptions)
+- **Standard** — blocked in full/partial/off; crazy-workspace overrides these within `./`
 
-**Git operations**
-- `git push` / `git merge` / `git reset --hard` / force operations
-- Amending published commits
-- "Discard this work" in finishing-branch
-- Deleting branches
+**Git operations** *(standard — crazy-workspace overrides git push, merge, reset within `./`)*
+- `git push` / `git merge` / `git reset --hard` / force operations ← crazy-workspace: auto within `./`
+- Amending published commits ← crazy-workspace: auto within `./`
+- "Discard this work" in finishing-branch ← crazy-workspace: auto within `./`
+- Deleting branches ← crazy-workspace: auto within `./`
 
 **Remote code execution patterns** *(HARD STOP in ALL modes, no exceptions, including crazy-workspace)*
 - Pipe-to-shell: `curl ... | bash`, `curl ... | sh`, `wget ... | bash`, `wget ... | sh`

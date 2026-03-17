@@ -1,6 +1,27 @@
 # Changelog
 
-## [Unreleased] — 2026-03-17
+## [Unreleased] — 2026-03-17 (iteration 2)
+
+### Added
+
+- **`/hands-free reset`**: new command to clear all learned preferences; always prompts for confirmation, never auto-accepted
+- **Mode transitions**: defined behavior for switching modes mid-session (immediate effect, no retroactive changes); `partial` mode automatically enables review-checkpoints
+- **Conflict resolution**: priority rules when two skills present simultaneous approval points (hard stop wins, more restrictive wins, preferences override both)
+- **Session log events**: added `[review-checkpoint]`, `[auto-commit]`, `[verification]`, `[hard-stop]`, `[user-override]` event types to log format
+- **Recommended Setup table**: expanded from single recommendation to use-case table covering 5 scenarios
+
+### Fixed
+
+- **Crazy-workspace activation announcement**: updated to list all 6 hard stops (was incorrectly listing only `rm -rf *` and `rm -rf .git`)
+- **Crazy-workspace "Two absolute hard stops"**: updated description to "Absolute hard stops (no exceptions)" to reflect the 5 universal hard stops now enforced
+- **Crazy-workspace decision flowchart**: updated to check pipe-to-shell, chmod 777, and secrets in addition to `rm -rf *` and `rm -rf .git`
+- **HARD STOP section**: clarified two-tier structure (universal vs. standard); git push and merge now correctly annotated as crazy-workspace overrideable within `./`
+
+### Changed
+
+- README "What it does": added pipe-to-shell/secrets blocking and review checkpoints to feature list; updated "Three modes" to "Four modes" (adds crazy-workspace)
+
+## [Unreleased] — 2026-03-17 (iteration 1)
 
 ### Added
 
