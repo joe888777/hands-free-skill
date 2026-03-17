@@ -292,6 +292,8 @@ These tools cannot write to disk, run code, or make side effects, so they are sa
 
 Note: Edit/Write to paths outside `./` (e.g., system config files, `~/.ssh/`) follow the path-escaping rules and require manual approval in all modes.
 
+**Shell script content scan:** When writing a shell script (`.sh`, `.bash`, `.zsh`, or any file with a shebang) via Edit or Write, scan the content for hard stop patterns (`curl | bash`, `wget | sh`, `chmod 777`, language RCE patterns). If found, announce the detected pattern and pause before writing — writing a script that embeds a hard stop pattern is equivalent to running that pattern. This check applies in all modes including crazy-workspace.
+
 ## Shell Command Auto-Pass Rules
 
 In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool calls without asking when **any** of these conditions are met:
@@ -411,6 +413,16 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `sort`, `uniq`, `head`, `tail`, `wc`, `cut`, `tr` on local file input → auto-pass (read-only text processing)
 - `brew install`, `brew upgrade`, `brew uninstall` → ask (writes to system paths outside cwd)
 - `brew update` → ask (modifies Homebrew installation); `brew list`, `brew info`, `brew search` → auto-pass (read-only)
+- `./script.sh` / `bash ./script.sh` / `sh ./script.sh` — running a local cwd script → auto-pass in full if the script file is within cwd AND Claude can verify the script doesn't embed hard stop patterns; ask if the script wasn't written by Claude in this session
+- `python ./script.py` / `node ./main.js` / `ruby ./script.rb` — running a local cwd script → same rules as shell scripts above; auto-pass if cwd-scoped and known-safe
+- `npm run <script>` — runs a package.json script → auto-pass if the script name is a known safe target (`test`, `build`, `lint`, `format`, `check`, `typecheck`, `dev`); ask if the script name is unfamiliar (e.g., `npm run deploy`, `npm run postinstall`)
+- `npx <package>@latest` or `npx <unfamiliar-package>` without a version pin → ask (downloads and runs arbitrary remote package); `npx <well-known-package>` like `npx eslint`, `npx vitest`, `npx jest`, `npx ts-node`, `npx prisma` → auto-pass (cwd-scoped, known tool)
+- `git stash drop` / `git stash drop stash@{N}` → ask (permanently discards a stash entry — not recoverable)
+- `git stash clear` → ask (destroys all stash entries — irreversible)
+- `git clean -n` / `git clean --dry-run` → auto-pass (dry run, shows what would be removed without doing it)
+- `openssl genrsa`, `openssl req`, `openssl x509`, `ssh-keygen`, `gpg --gen-key` → auto-pass if writing to cwd (key/cert generation is local, cwd-scoped); ask if writing to `~/.ssh/`, `~/.gnupg/` or any path outside cwd (modifies user's credential store)
+- `htpasswd -c ./auth/.htpasswd user` → auto-pass (creates password file within cwd; hash-only, no plaintext stored); `htpasswd -c /etc/nginx/.htpasswd user` → ask (writes outside cwd)
+- `strace -p <pid>` / `ltrace -p <pid>` → ask (attaches to a running process — can expose sensitive data from arbitrary processes); `strace ./cwd-program` → auto-pass (traces a local program)
 - `apt-get install`, `dnf install`, `yum install` → ask (system package manager, writes to system paths)
 - `systemctl start/stop/restart/enable/disable` → ask (modifies system service state); `systemctl status` → auto-pass (read-only)
 - `kill <pid>`, `pkill <name>`, `killall <name>` → ask (terminates processes — destructive)
@@ -554,6 +566,19 @@ digraph {
 | `sqlite3 ./db.sqlite .dump > backup.sql` | auto-pass (local backup to cwd) |
 | `git bisect start` | auto-pass (non-destructive debugging) |
 | `git bisect good abc1234` | auto-pass (marks commit as good) |
+| `git stash drop` | ask (permanently discards stash entry) |
+| `git stash clear` | ask (destroys all stash entries) |
+| `git clean -n` | auto-pass (dry run, read-only) |
+| `./scripts/test.sh` | auto-pass (cwd-scoped local script) |
+| `bash ./build.sh` | auto-pass (cwd-scoped local script) |
+| `npm run test` | auto-pass (known-safe target) |
+| `npm run build` | auto-pass (known-safe target) |
+| `npm run deploy` | ask (unfamiliar/deployment script) |
+| `npx eslint src/` | auto-pass (well-known tool, cwd-scoped) |
+| `npx some-unknown-package@latest` | ask (downloads arbitrary package) |
+| `openssl genrsa -out ./certs/key.pem 4096` | auto-pass (writes to cwd) |
+| `ssh-keygen -t ed25519 -f ./deploy_key` | auto-pass (writes to cwd) |
+| `ssh-keygen -t rsa -f ~/.ssh/id_rsa` | ask (writes to ~/.ssh — outside cwd) |
 | `git bisect reset` | auto-pass (returns to HEAD) |
 | `sqlite3 ./db.sqlite < ./schema.sql` | auto-pass (cwd-scoped, local DB file) |
 | `sqlx migrate run` | auto-pass (reads DATABASE_URL from env) |
@@ -699,10 +724,11 @@ Filename patterns to block:
 - `*.cer`, `*.der`, `*.crt` — certificate files that may include private key material
 
 Content signals in staged diffs (case-insensitive):
-- Token prefixes: `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_`, `AKIA` (AWS key prefix)
-- Key markers: `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`
-- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`, `database_url=`, `signing_key=`
-- HTTP auth headers hardcoded in source: `Authorization: Bearer `, `X-Api-Key: ` (case-insensitive) in non-test, non-example files
+- Token prefixes: `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_`, `AKIA` (AWS key prefix), `xoxb-`, `xoxp-` (Slack tokens)
+- Key markers: `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`, `-----BEGIN PGP`
+- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`, `database_url=`, `signing_key=`, `client_secret=`, `totp_secret=`, `smtp_password=`, `ftp_password=`, `sftp_password=`, `access_key=`, `auth_token=`
+- HTTP auth headers hardcoded in source: `Authorization: Bearer `, `X-Api-Key: `, `X-Auth-Token: ` (case-insensitive) in non-test, non-example files
+- Hardcoded connection strings: `postgres://` or `postgresql://` with a password component (`postgresql://user:password@...`), `mongodb+srv://user:pass@`, `amqp://user:pass@`
 
 Never override this check, even in crazy-workspace mode. Secrets detection is a hard stop in all modes.
 
