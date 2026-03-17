@@ -206,6 +206,15 @@ When in doubt: if the approval leads directly to running code or writing files, 
 - If the wording is "I suggest" / "I'd recommend" / "best option is" / "my preference is" → treat as recommendation
 - If genuinely ambiguous ("either would work"), treat as no recommendation → apply "When There Is No Recommended Option" rules
 
+**Non-standard recommendation markers** — recognize all these patterns as equivalent to "(recommended)":
+- `★ Option A` or `⭐ Option A` (star marker)
+- `Option A (best for most users)` / `Option A (best default)` / `Option A (preferred)`
+- `Option A ← recommended` / `Option A [recommended]` / `Option A — recommended`
+- `[default]` / `(default)` — treat as recommended; it's the tool's chosen default
+- `→ Option A` as the only option with an arrow (common in menu-style presentations)
+
+Treat all of these as explicit recommendations and auto-pick accordingly.
+
 If a custom skill's approval point matches a hard stop pattern (destructive action, secrets, etc.), the hard stop takes precedence over the approval point.
 
 **Deployment/publish keywords in custom skill approvals:** If a custom skill's approval point text contains keywords like "deploy", "publish", "push to [service]", "upload to", "release to production", "send to", or similar external-operation indicators — treat it as a shared/remote state hard stop and pause in all modes (including full). The action's name reveals intent when the action type cannot be inferred from the command itself.
@@ -328,6 +337,10 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `ssh user@host`, `scp user@host:...`, `rsync` to/from remote host → ask (remote machine access — not within `./`)
 - `git submodule add <url>` → auto-pass in full (adds submodule to cwd, non-destructive); ask in partial (execution-type decision)
 - Cloud storage CLIs writing to remote buckets → ask (remote state, not within `./`): `aws s3 cp`/`sync`/`rm`, `gsutil cp`/`rsync`/`rm`, `az storage blob upload`; cloud read commands (`aws s3 ls`, `gsutil ls`) → auto-pass (read-only)
+- `kubectl exec -it <pod> -- bash` → ask (opens a shell in a remote Kubernetes pod)
+- `kubectl apply -f ./k8s/` → auto-pass in full (applies local manifests; cwd-scoped); ask in partial (deploys to cluster — execution-type)
+- `kubectl delete` → ask (destructive cluster operation)
+- `docker exec -it <container> bash` → auto-pass (executing in a locally-running container; stays within local environment)
 - `nc`/`netcat` connecting to a remote host → ask; `nc -l` listening locally → auto-pass (local, user can disconnect)
 
 **Compound command rule:** For shell commands with `&&`, `||`, or `;` operators, classify by the most restrictive component. If any component would be a HARD STOP → HARD STOP. If any component would ask → ask. Only auto-pass if ALL components independently auto-pass.
