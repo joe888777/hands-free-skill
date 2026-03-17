@@ -195,7 +195,12 @@ If a custom skill's approval point matches a hard stop pattern (destructive acti
 
 ### When You Must Pause and Ask
 
-In partial mode or at hard stops, when presenting options to the user via `AskUserQuestion`, mark the recommended option with a `markdown` preview panel — do NOT add "(Recommended)" to the label:
+**In full mode, do NOT call AskUserQuestion for skill approval points** — instead, announce the decision and continue. AskUserQuestion is appropriate in full mode only for:
+- Clarifying questions that cannot be inferred (e.g., "What should the API endpoint be named?")
+- Hard stop situations where user input is required
+- Any situation where proceeding without input would produce an incorrect result (not just a non-recommended one)
+
+**In partial mode or at hard stops**, when presenting approval-point options to the user via `AskUserQuestion`, mark the recommended option with a `markdown` preview panel — do NOT add "(Recommended)" to the label:
 
 ```
 {
