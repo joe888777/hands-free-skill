@@ -482,6 +482,17 @@ Additional git command behavior (governed by normal mode rules, not always-pass)
 - `git bisect start`, `git bisect good`, `git bisect bad`, `git bisect reset` → auto-pass in full (debugging tool; bisect run is non-destructive read-only; bisect reset returns to HEAD)
 - `cd` within the workspace — changing into any subdirectory of the current workspace
 - `cargo nextest run` / `cargo nextest run --workspace` — next-generation Rust test runner (cwd-scoped, replaces `cargo test`)
+- `cargo metadata --format-version 1` → auto-pass (read-only JSON metadata about the workspace)
+- `cargo vendor ./vendor` → auto-pass (creates a vendor/ directory in cwd for offline builds)
+- `cargo package` → auto-pass (packages the crate into a `.crate` file in `target/package/`; cwd-scoped; does not publish)
+- **HTTP load testing tools** (cwd-scoped, target local or explicitly authorized servers):
+  - `wrk http://localhost:8080/` → auto-pass (targets localhost — local load test)
+  - `wrk https://remote.example.com/` → ask (targets remote server — requires authorization)
+  - `hey -n 100 http://localhost:3000/` → auto-pass (targets localhost)
+  - `hey -n 1000 https://remote.example.com/` → ask (targets remote)
+  - `ab -n 100 http://localhost:8080/` → auto-pass (Apache Bench, localhost)
+  - `ab -n 1000 https://remote.example.com/api` → ask (remote load test)
+  - `vegeta attack -targets=./targets.txt -rate=10 -duration=30s | vegeta report` → auto-pass if `targets.txt` contains only localhost URLs; ask if remote URLs
 - `cargo expand` / `cargo expand --package <name>` — expand macros for inspection (cwd-scoped, read-only output)
 - `cargo fix` / `cargo fix --allow-dirty` — auto-apply linter suggestions (cwd-scoped, only modifies cwd files)
 - `cargo clippy --fix` — auto-fix Clippy suggestions (cwd-scoped, modifies source files)
@@ -655,6 +666,12 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `cargo init` / `cargo new <name>` → auto-pass (creates a new Rust project in cwd)
 - `direnv allow` → auto-pass (enables loading of the local `.envrc` into the shell — only loads env vars, no code execution)
 - `tee ./output.log` when receiving piped cwd input → auto-pass (cwd-scoped output); `tee /etc/...` → ask (writes outside cwd)
+- **Shell output redirection:** `cmd > ./output.txt` or `cmd >> ./log.txt` — classify by the command AND the destination:
+  - If `cmd` auto-passes AND destination is within cwd → auto-pass (e.g., `cargo test 2>&1 > ./test.log`)
+  - If `cmd` auto-passes but destination escapes cwd → ask (e.g., `cargo test > /tmp/output.txt`)
+  - If `cmd` would ask → ask (regardless of destination; apply compound rule)
+  - `>` (overwrite) and `>>` (append) both follow the same destination classification
+  - `2>&1` (stderr redirect to stdout) is transparent — does not change classification
 - `cmake -B build -S .` / `cmake --build build` → auto-pass (cwd-scoped build system configuration and compilation)
 - `ninja -C build` → auto-pass (cwd-scoped build runner)
 - `meson setup build` / `meson compile -C build` → auto-pass (cwd-scoped build)
