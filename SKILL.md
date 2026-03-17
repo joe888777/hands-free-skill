@@ -627,6 +627,24 @@ digraph {
 | `python -m venv .venv` | auto-pass (creates venv in cwd) |
 | `pip install -e .` (venv active) | auto-pass (editable install into active venv) |
 | `pip install -e .` (no venv) | ask (installs to system/user Python — outside cwd) |
+| `black .` | auto-pass (cwd-scoped Python formatter) |
+| `isort ./src` | auto-pass (cwd-scoped import sorter) |
+| `bandit -r ./src` | auto-pass (cwd-scoped security linter) |
+| `safety check` | auto-pass (cwd-scoped, checks vulnerable packages) |
+| `coverage run -m pytest` | auto-pass (cwd-scoped) |
+| `coverage html` | auto-pass (cwd-scoped, generates htmlcov/) |
+| `ts-node ./script.ts` | auto-pass (runs local TS file in cwd) |
+| `tsx ./script.ts` | auto-pass (runs local TS file, faster than ts-node) |
+| `biome check .` | auto-pass (cwd-scoped, Biome linter) |
+| `biome format --write .` | auto-pass (cwd-scoped, Biome formatter) |
+| `vitest watch` | auto-pass (cwd-scoped, watch mode) |
+| `cargo outdated` | auto-pass (read-only, checks dep versions) |
+| `cargo tree` | auto-pass (read-only dependency tree) |
+| `cargo deny check` | auto-pass (cwd-scoped security audit) |
+| `cargo machete` | auto-pass (finds unused dependencies) |
+| `sqlx migrate revert` | ask (reverts DB migration — potentially destructive) |
+| `alembic downgrade -1` | ask (downgrades DB schema) |
+| `diesel migration revert` | ask (reverts last DB migration) |
 | `docker run -v ./:/app node:20 npm test` | auto-pass (mounts cwd) |
 | `docker run -v /:/host ubuntu bash` | ask (mounts root filesystem) |
 | `git config --global user.email "me@example.com"` | ask (modifies global git config) |
@@ -787,6 +805,16 @@ If no CLAUDE.md directive exists (or the section is absent), start silently in `
 **CLAUDE.md vs mode conflict:** If CLAUDE.md defines a project-level rule like "always ask before git push" and the user activates `crazy-workspace`, the CLAUDE.md rule takes precedence for that project — git push remains a hard stop. CLAUDE.md overrides are stronger than mode settings, because the user explicitly configured them for the project.
 
 **`Default mode` is the initial state, not a maximum:** If CLAUDE.md says `Default mode: full` and the user types `/hands-free crazy-workspace`, crazy-workspace takes over immediately. The directive only sets the starting mode at session start — the user can always switch modes manually during the session.
+
+**User command vs CLAUDE.md conflict:** When the user types a `/hands-free` command that contradicts a CLAUDE.md directive, **the user command always wins for the current session**. Example: CLAUDE.md says `Auto-commit: off`, but user types `/hands-free auto-commit on` → auto-commit is now on for this session. The CLAUDE.md directive applies next session unless the user types the same override again. This "session override" principle applies to all settings except CLAUDE.md project-level security rules (e.g., "psql postgresql://prod must always ask") — those are project constraints that cannot be overridden by a user command.
+
+**Showing active CLAUDE.md overrides in `/hands-free status`:** If project-level overrides are active, add a section:
+```
+  CLAUDE.md overrides (3 active):
+    Default mode: full (applied at session start)
+    Auto-commit: on (applied at session start)
+    psql postgresql://prod → always ask (security rule, cannot override)
+```
 
 **`/hands-free learning` with no argument:** Prints the current learning level and threshold summary:
 ```
@@ -1423,6 +1451,14 @@ Check for less-obvious causes:
 - The file was created outside the workspace (`/tmp/`, `~/.config/`) and is not tracked in this repo
 - All changed files are listed in `.gitignore`
 - No `git init` was run — the directory is not a git repo
+
+### "Database migration revert is being blocked"
+
+`sqlx migrate revert`, `alembic downgrade`, and `diesel migration revert` are classified as "ask" because they modify the database schema in a way that may be destructive. `terraform destroy` is similarly blocked. To proceed: confirm the prompt. If this is a dev database and you always want these to auto-pass, add a CLAUDE.md override:
+```markdown
+# hands-free overrides
+- sqlx migrate revert on development databases → auto-pass
+```
 
 ### "Redis commands are being blocked unexpectedly"
 
