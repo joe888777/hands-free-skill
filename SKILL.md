@@ -224,6 +224,7 @@ digraph {
 | `python -m pytest tests/` | auto-pass (cwd-scoped) |
 | `cargo build --release` | auto-pass (cwd-scoped) |
 | `make build` | auto-pass (cwd-scoped) |
+| `curl -o ./tool https://example.com/tool` | auto-pass (writes to cwd) |
 | `cp file.txt /etc/config` | ask (escapes cwd) |
 | `rm -rf ~/.config/app` | ask (escapes cwd) |
 | `curl -o /usr/local/bin/tool ...` | ask (writes outside cwd) |
@@ -411,21 +412,31 @@ To enable: /hands-free [mode]
 
 ## `/hands-free recommend`
 
-When invoked, analyze `preferences.md` and current usage to suggest optimal settings:
+When invoked, analyze `preferences.md` and current session decisions to suggest optimal settings:
 
 ```
 Hands-Free Recommendations:
-  Mode: full (you rarely override auto-accepted decisions)
+  Mode: full (you rarely override auto-accepted decisions — 2/14 overrides)
   Learning: high (you're consistent — 90% of choices match first occurrence)
-  Suggestion: Consider adding git push to feature branches as auto-accept
-             (you've approved 8/8 feature branch pushes, rejected 0)
+  Auto-commit: on (you're committing manually after every task anyway)
+
+  Suggestions:
+  - Consider enabling review-checkpoints (you paused 3/3 times before execution)
+  - Consider adding git push to feature branches as auto-accept
+    (you've approved 8/8 feature branch pushes, rejected 0)
+    → Type '/hands-free recommend promote git-push-feature-branch' to enable
+
+  No changes (low confidence — watching):
+  - brainstorming: chose simplest over recommended 2x (need 1 more for rule)
 ```
 
 **Smart suggestions include:**
-- Mode upgrade/downgrade based on override frequency
-- Learning level based on choice consistency
-- Promoting standard hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation to add)
-- Demoting auto-accept actions to hard-stop if user frequently overrides
+- Mode upgrade/downgrade based on override frequency (< 20% overrides → suggest upgrade)
+- Learning level based on choice consistency (> 85% consistent → suggest high)
+- Auto-commit suggestion if user makes frequent manual commits at task boundaries
+- `review-checkpoints on` if user manually paused before execution 3+ times
+- Promoting standard hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation via `/hands-free recommend promote <action>`)
+- Demoting auto-accept actions to hard-stop if user frequently overrides (> 50% override rate)
 
 **What `/hands-free recommend` will NEVER suggest:**
 - Promoting `curl | bash`, `chmod 777`, secrets detection, `rm -rf *`, or `rm -rf .git` to auto-accept — these are universal hard stops that cannot be promoted under any circumstances, regardless of usage history
@@ -488,7 +499,9 @@ The two "always" checkpoints (before execution starts, before push/merge) fire r
 
 ## Session Log
 
-Tracked in memory. View with `/hands-free log`:
+Tracked in memory for the current session only. **Not persisted across sessions** — the log resets when the conversation ends. For durable history, use git log with `[ralph #N]` tags (auto-commit) or `preferences.md` (learned rules).
+
+View with `/hands-free log`:
 
 ```
 Hands-Free Session Log (full, learning: high)
@@ -590,6 +603,7 @@ Apply this decision table:
 
 "Plan files" = any of: `PLAN.md`, `.claude/plan.md`, `tasks.md`, or files created by writing-plans skill.
 "Last test output" = the final test runner result visible in the current iteration's context.
+"`[ralph #N]` commits" = commits tagged with `[ralph #N]` via auto-commit; if user committed without auto-commit, these tags won't exist — fall back to checking git status and plan files only.
 
 If the state cannot be determined (ambiguous), default to resuming executing-plans from the last known batch and announce: `[hands-free] Iteration state ambiguous — resuming executing-plans from last batch.`
 
