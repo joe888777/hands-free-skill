@@ -809,12 +809,25 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `pg_isready` → auto-pass (read-only health check for local PostgreSQL)
 - `pg_dump -h localhost ./backup.sql` / `pg_dump -U user mydb > ./backup.sql` → auto-pass (backs up local DB to cwd)
 - `pg_dump -h remote-host mydb` → ask (dumps from remote DB host)
+- `pg_dump -h localhost -Fc ./backup.dump` → auto-pass (custom format; cwd-scoped output)
+- `pg_restore -h localhost -d mydb ./backup.dump` → ask (restores into a local DB — modifies DB state; destructive if DB has data)
+- `pg_restore -h localhost --data-only -d mydb ./backup.dump` → ask (data-only restore — mutates existing DB rows)
+- `pg_restore -h localhost --schema-only -d mydb ./backup.dump` → ask (schema restore; modifies table structure)
+- `pg_restore -l ./backup.dump` → auto-pass (lists backup contents; read-only)
+- `psql -h localhost mydb -c "COPY table TO STDOUT"` → auto-pass (reads local DB data to stdout; equivalent to pg_dump for a single table)
+- `psql -h localhost mydb -c "COPY table FROM STDIN"` / `COPY table FROM './data.csv'` → ask (loads data into table — modifies DB state)
 - `mongodump --out ./backup/ --db mydb` (localhost) → auto-pass (local MongoDB dump to cwd)
 - `mongodump --host remote-db --out ./backup/` → ask (remote MongoDB host)
-- `mongorestore ./backup/` (localhost) → auto-pass (restores local MongoDB from cwd backup)
+- `mongorestore ./backup/` (localhost) → ask (restores local MongoDB — modifies DB state; potentially overwrites existing data)
+- `mongorestore --dryRun ./backup/` → auto-pass (dry-run preview; meta-rule: dry-run)
 - `mysqldump -h localhost mydb > ./backup.sql` → auto-pass (local MySQL dump to cwd)
 - `mysqldump -h remote-host mydb` → ask (remote MySQL host)
 - `mysql -h localhost mydb < ./migration.sql` → auto-pass (local MySQL, cwd-scoped SQL file)
+- `mysql -h localhost mydb < ./restore.sql` → ask if the SQL file name suggests a full restore (heuristic: files named `restore`, `backup`, `dump`, `import`, `seed` suggest data loading — ask)
+- `sqlite3 ./db.sqlite .dump > ./backup.sql` → auto-pass (exports SQLite DB to cwd text file; read-only for the DB)
+- `sqlite3 ./db.sqlite < ./restore.sql` → ask (restores data into SQLite — modifies DB state)
+- `redis-cli --rdb ./dump.rdb` → auto-pass (dumps Redis RDB snapshot to cwd; read-only for the running Redis)
+- `redis-cli debug bgsave` / `redis-cli bgsave` → ask (triggers background DB save — modifies Redis persistence state)
 - **Protocol Buffers / gRPC:**
   - `protoc --go_out=./gen ./proto/*.proto` → auto-pass (cwd-scoped code generation)
   - `buf lint ./proto` → auto-pass (cwd-scoped lint)
@@ -3404,6 +3417,46 @@ Alternatively, if the base command is a HARD STOP (pipe-to-shell, `chmod 777`, e
 ### "`hg push` is blocked just like `git push`"
 
 Yes, intentionally. `hg push` sends commits to a remote Mercurial repository, just like `git push`. It requires user confirmation in full/partial/off modes (auto in crazy-workspace). `hg pull` is auto-pass because it only fetches — it doesn't update the working directory (use `hg update` after pulling, which is auto-pass).
+
+### "`rebar3 publish` is blocked — I just want to publish to Hex.pm"
+
+`rebar3 publish` pushes an Erlang package to the public Hex.pm registry — external shared state that cannot be undone once published. This is equivalent to `npm publish` or `cargo publish` and always requires explicit confirmation. Use `rebar3 hex` for read-only operations (list, search) which auto-pass.
+
+### "`wandb sync` is blocked even though it just uploads my local run data"
+
+`wandb sync` pushes local experiment data to Weights & Biases servers — this is external remote state and affects your W&B dashboards visible to your team. Uploading run data permanently affects shared experiment history. Use `wandb offline` to prevent automatic syncing (auto-pass), then confirm `wandb sync` manually when ready to publish results.
+
+### "`sops --decrypt` is blocked — I just need to read the secrets"
+
+`sops --decrypt` exposes plaintext secrets to stdout or a file, which can then be captured by shell history, log files, or process inspection. Even though it doesn't write to a remote system, it requires explicit confirmation because: (1) the decrypted output must not be accidentally committed or logged, and (2) the intent to decrypt production secrets should always be a deliberate action. Use `sops --edit` (which also asks) for safe in-editor editing without stdout exposure risk.
+
+### "`tcpdump` is blocked even on localhost"
+
+Yes, intentionally. Live packet capture (`tcpdump`, `tshark` with `-i`) captures all traffic on the interface, including auth tokens, session cookies, API keys, and passwords — even on localhost. The captured data may contain sensitive credentials that shouldn't be written to disk without review. Reading an already-captured `.pcap` file (`tcpdump -r ./capture.pcap`) is auto-pass because no new sensitive data is collected.
+
+### "`rover graph check` is blocked — I'm just running a schema check"
+
+`rover graph check` sends your local schema to Apollo Studio for analysis — it's a network call to an external API that may expose schema details. For the same reason, `rover subgraph publish` is blocked (it modifies Apollo Registry state). If you're running schema checks locally only, use `rover graph introspect http://localhost:4000/graphql` (auto-pass for localhost) or `buf lint ./proto` (fully local).
+
+### "`istioctl install` is blocked"
+
+`istioctl install` makes cluster-wide changes — it installs Istio control plane components into your Kubernetes cluster, potentially disrupting routing for all services. Always requires confirmation. Use `istioctl analyze ./k8s/` (auto-pass) for local manifest analysis without cluster changes.
+
+### "`just <recipe>` is blocked — I just wrote that recipe myself"
+
+`just` recipes are classified by name (same pattern as `npm run <script>`). If the recipe name matches deploy/publish/release/prod patterns, it asks. To auto-pass: use recipe names that match safe patterns (build, test, lint, format). Alternatively, `just --list` (auto-pass) shows you all recipes so you can identify which ones will be asked about.
+
+### "`supervisorctl start myapp` is blocked — I manage my own processes"
+
+`supervisorctl start/stop/restart` modifies process state managed by supervisord — these processes often run production services or long-lived background workers. Starting a process may open ports, start HTTP servers, or begin processing queues. Always requires confirmation. `supervisorctl status` (auto-pass) shows current state without changes.
+
+### "`tox -e publish` is blocked — I'm just publishing my Python package"
+
+`tox -e publish` (or any tox environment named `publish`, `release`, `deploy`) publishes to PyPI — external, irreversible action. The tox env name classification follows the same `npm run` pattern: build/test/lint → auto; publish/release/deploy → ask.
+
+### "`pip-sync` is blocked — I just want to install from my requirements.txt"
+
+`pip-sync` modifies your active Python environment (uninstalls packages not in requirements.txt in addition to installing those that are). This writes outside cwd (to the venv or system Python) and can break other projects that share the same environment. Use `pip-sync --dry-run ./requirements.txt` (auto-pass) to preview the changes, then confirm manually. For cwd-isolated environments (`uv venv .venv`), hands-free still asks because pip-sync modifies the environment, not just cwd files.
 
 ## HARD STOP — Always Pause
 
