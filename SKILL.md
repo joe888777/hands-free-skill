@@ -31,7 +31,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free full         # same — auto-accept all non-destructive points
 /hands-free partial      # auto-accept design only, pause at execution
 /hands-free off          # disable
-/hands-free crazy-workspace         # approve everything under ./, except rm -rf * and rm -rf .git
+/hands-free crazy-workspace         # approve everything under ./ (5 universal hard stops remain)
 /hands-free auto-commit on    # auto-commit changes at natural milestones
 /hands-free auto-commit off   # disable auto-commit (default)
 /hands-free review-checkpoints on   # pause at major phase transitions for review
@@ -421,8 +421,11 @@ Hands-Free Recommendations:
 **Smart suggestions include:**
 - Mode upgrade/downgrade based on override frequency
 - Learning level based on choice consistency
-- Promoting hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation to add)
+- Promoting standard hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation to add)
 - Demoting auto-accept actions to hard-stop if user frequently overrides
+
+**What `/hands-free recommend` will NEVER suggest:**
+- Promoting `curl | bash`, `chmod 777`, secrets detection, `rm -rf *`, or `rm -rf .git` to auto-accept — these are universal hard stops that cannot be promoted under any circumstances, regardless of usage history
 
 ## Review Checkpoints
 
