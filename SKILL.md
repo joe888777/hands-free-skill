@@ -1,6 +1,6 @@
 ---
 name: hands-free
-description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/off modes, learning sensitivity, and smart recommendations.
+description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, privilege escalation, and secrets detection in all modes.
 ---
 
 # Hands-Free
@@ -23,6 +23,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free dry-run      # preview what hands-free would auto-accept right now
 /hands-free pause        # temporarily suspend auto-accept without changing mode
 /hands-free resume       # resume auto-accept after a pause
+/hands-free explain      # explain why the last auto-accept decision was made
 /hands-free recommend    # show recommended settings based on usage
 /hands-free reset        # clear all learned preferences (requires confirmation)
 /hands-free log          # show session decisions
@@ -109,6 +110,27 @@ Applies to **any skill** — not just superpowers:
 - Approval to continue → approve
 - Design/plan review → approve
 - Checkpoint pause → continue
+
+### When There Is No Recommended Option
+
+If a skill presents options but marks none as recommended:
+
+1. Check `preferences.md` — if a matching learned preference exists at medium or high confidence, use it and announce: `"Going with [option] (your preference)"`
+2. If no learned preference: pick the **first** option listed and announce: `"Going with [option] (first listed — no recommendation. Override next time with your preference)"`
+3. Log the choice as an observation in `preferences.md`
+
+Do NOT pause indefinitely just because no recommendation exists. Make a decision, announce it, and continue.
+
+### Custom Skill Integration
+
+Hands-free works with any skill that presents approval points, not just superpowers. For custom skills, hands-free recognizes these patterns as approval points:
+
+- A list of 2+ options where one has a "recommended" or "default" label → auto-pick it
+- A phrase like "Does this look right?", "Shall I proceed?", "Continue?" → approve
+- A numbered choice like "1. Option A  2. Option B (recommended)" → pick the recommended one
+- Any request for the user to choose between paths forward → apply current mode rules
+
+If a custom skill's approval point matches a hard stop pattern (destructive action, secrets, etc.), the hard stop takes precedence over the approval point.
 
 ### When You Must Pause and Ask
 
@@ -253,6 +275,12 @@ Preferences stored in `~/.claude/skills/hands-free/preferences.md`. Records choi
 - Choices made under time pressure that the user might not repeat
 - Choices that conflict with each other (record the most recent only)
 - Hard stop approvals — never promote a hard stop to auto-accept based on past approvals alone; that requires the user to explicitly set it via `/hands-free recommend` → "Add to auto-accept"
+
+**Preference staleness:** Observations in `preferences.md` do not expire automatically. However, if the user makes a choice that contradicts an existing medium- or high-confidence preference, update the record:
+- User chose differently 1x → note the divergence as an observation, keep existing rule
+- User chose differently 2x → downgrade rule confidence by one level
+- User chose differently 3x → replace the rule with the new preference at low confidence
+- `/hands-free reset` wipes all preferences immediately if needed
 
 ### When to Record
 
@@ -443,6 +471,26 @@ Hands-Free Session Log (full, learning: high)
 ```
 
 Events logged: `[brainstorming]`, `[writing-plans]`, `[executing-plans]`, `[verification]`, `[finishing-branch]`, `[auto-commit]`, `[review-checkpoint]`, `[systematic-debugging]`, `[hard-stop]`, `[user-override]`.
+
+## `/hands-free explain`
+
+When invoked, explain the reasoning behind the most recent auto-accept decision:
+
+```
+/hands-free explain
+
+Last auto-accept: [writing-plans] subagent-driven
+
+Why:
+  Skill presented 2 options: "subagent-driven" and "parallel-session"
+  "subagent-driven" was marked as recommended by the writing-plans skill
+  Mode (full) → auto-accept recommended options
+  Learned preference matched: writing-plans → "subagent-driven" (3x, medium confidence)
+
+Override: type /hands-free off and re-run the last command to choose manually
+```
+
+If no auto-accept has been made in this session: `No auto-accept decisions have been made yet this session.`
 
 ## `/hands-free pause` and `/hands-free resume`
 

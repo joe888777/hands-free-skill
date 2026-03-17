@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased] — 2026-03-17 (iteration 2, pass 3)
+
+### Added
+
+- **`/hands-free explain`**: explain the reasoning behind the most recent auto-accept decision (skill recommendation, mode, and any learned preference that influenced the choice)
+- **"When There Is No Recommended Option"**: defined behavior when a skill presents options without a recommendation — use learned preference, then first-listed, then log and continue
+- **Custom Skill Integration**: documented how hands-free recognizes approval point patterns in non-superpowers custom skills
+- **Preference staleness**: rules for downgrading confidence when user repeatedly contradicts a learned preference
+
+### Fixed
+
+- **Frontmatter description**: updated to mention crazy-workspace, review checkpoints, pause/resume, security hard stops — was stale (mentioned only 3 modes)
+
 ## [Unreleased] — 2026-03-17 (iteration 2, pass 2)
 
 ### Added
