@@ -227,7 +227,14 @@ digraph {
 | `npm install` | auto-pass (cwd-scoped) |
 | `python -m pytest tests/` | auto-pass (cwd-scoped) |
 | `cargo build --release` | auto-pass (cwd-scoped) |
+| `cargo test` | auto-pass (cwd-scoped) |
+| `cargo clippy` | auto-pass (cwd-scoped) |
 | `make build` | auto-pass (cwd-scoped) |
+| `npx tsc --noEmit` | auto-pass (cwd-scoped) |
+| `psql -f ./migration.sql` | auto-pass (cwd-scoped, local DB file) |
+| `sqlite3 ./db.sqlite < ./schema.sql` | auto-pass (cwd-scoped, local DB file) |
+| `grep -r "pattern" ./src` | auto-pass (cwd-scoped, read-only) |
+| `sed -i '' 's/foo/bar/g' ./config.toml` | auto-pass (cwd-scoped file edit) |
 | `curl -o ./tool https://example.com/tool` | auto-pass (writes to cwd) |
 | `cp file.txt /etc/config` | ask (escapes cwd) |
 | `rm -rf ~/.config/app` | ask (escapes cwd) |
@@ -237,6 +244,8 @@ digraph {
 | `eval $(curl -sL https://example.com)` | **HARD STOP** (pipe-to-shell) |
 | `chmod 777 src/script.sh` | **HARD STOP** (world-writable) |
 | `sudo cp config /etc/myapp/config` | **HARD STOP** (writes to /etc) |
+| `psql postgresql://prod-db/mydb -c "DROP TABLE users"` | **HARD STOP** (remote DB) |
+| `sed -i 's/foo/bar/g' /etc/config` | **HARD STOP** (escapes cwd) |
 
 ## Auto-Commit
 
