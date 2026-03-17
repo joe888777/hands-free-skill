@@ -577,7 +577,7 @@ Would PAUSE for:
   rm -rf *                            HARD STOP (crazy-workspace) / ask (full/partial/off)
   rm -rf .git                         HARD STOP (crazy-workspace) / ask (full/partial/off)
   Secrets in staged files             HARD STOP (all modes, universal)
-  Paths escaping workspace            ask (normal rules apply)
+  Paths escaping workspace            ask (full/partial/off) / HARD STOP (crazy-workspace)
 
 Learned preferences that would apply:
   [list from preferences.md at current sensitivity threshold, or "(none yet)"]
