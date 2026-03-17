@@ -189,6 +189,8 @@ Hands-free works with any skill that presents approval points, not just superpow
 
 If a custom skill's approval point matches a hard stop pattern (destructive action, secrets, etc.), the hard stop takes precedence over the approval point.
 
+**Deployment/publish keywords in custom skill approvals:** If a custom skill's approval point text contains keywords like "deploy", "publish", "push to [service]", "upload to", "release to production", "send to", or similar external-operation indicators — treat it as a shared/remote state hard stop and pause in all modes (including full). The action's name reveals intent when the action type cannot be inferred from the command itself.
+
 **Custom skill's own "are you sure?" prompts:** If a custom skill has its own internal confirmation prompt (e.g., "This will delete all temp files. Continue?"), hands-free treats it as a standard checkpoint approval. In full mode: auto-approve. In partial mode: depends on whether it's execution-type (ask) or other (auto). Hard stop patterns still take precedence.
 
 ### When You Must Pause and Ask
