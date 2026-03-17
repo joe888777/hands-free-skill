@@ -90,7 +90,7 @@ This activates those settings at the start of every session without typing `/han
 | Phase transitions | auto | auto | ask | auto |
 | Read-only tools (Grep, Glob, Read, WebFetch) | auto | auto | ask | auto |
 | Shell cmd scoped to current dir | auto | auto | ask | auto |
-| `pyenv` commands | auto | auto | ask | auto |
+| Version managers (`pyenv`, `nvm`, `rustup`) | auto | auto | ask | auto |
 | `git init` | auto | auto | ask | auto |
 | `git add` | auto | auto | ask | auto |
 | `cd` within workspace | auto | auto | ask | auto |
@@ -338,6 +338,7 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `ssh user@host`, `scp user@host:...`, `rsync` to/from remote host → ask (remote machine access — not within `./`)
 - `git submodule add <url>` → auto-pass in full (adds submodule to cwd, non-destructive); ask in partial (execution-type decision)
 - Cloud storage CLIs writing to remote buckets → ask (remote state, not within `./`): `aws s3 cp`/`sync`/`rm`, `gsutil cp`/`rsync`/`rm`, `az storage blob upload`; cloud read commands (`aws s3 ls`, `gsutil ls`) → auto-pass (read-only)
+- `curl -X POST/PUT/PATCH/DELETE` to external URLs → ask (sends or modifies remote data); `curl GET` / `curl -o ./file` → auto-pass (read-only or writes to cwd)
 - `kubectl exec -it <pod> -- bash` → ask (opens a shell in a remote Kubernetes pod)
 - `kubectl apply -f ./k8s/` → auto-pass in full (applies local manifests; cwd-scoped); ask in partial (deploys to cluster — execution-type)
 - `kubectl delete` → ask (destructive cluster operation)
@@ -443,6 +444,14 @@ digraph {
 | `grep -r "pattern" ./src` | auto-pass (cwd-scoped, read-only) |
 | `sed -i '' 's/foo/bar/g' ./config.toml` | auto-pass (cwd-scoped file edit) |
 | `curl -o ./tool https://example.com/tool` | auto-pass (writes to cwd) |
+| `curl https://api.example.com/data` | auto-pass (GET, read-only) |
+| `curl -X POST https://api.example.com/data -d '{}'` | ask (sends data to external service) |
+| `curl -X PUT https://api.example.com/resource -d '{}'` | ask (modifies external resource) |
+| `curl -X DELETE https://api.example.com/resource` | ask (deletes external resource) |
+| `pg_dump -h localhost ./backup.sql` | auto-pass (local DB, writes to cwd) |
+| `pg_dump -h prod-db.example.com mydb > backup.sql` | ask (remote DB) |
+| `sea-orm-cli migrate up` | auto-pass (cwd-scoped, reads config) |
+| `wasm-bindgen --target web ./target/...` | auto-pass (cwd-scoped, Rust wasm post-processing) |
 | `cp file.txt /etc/config` | ask (escapes cwd) |
 | `rm -rf ~/.config/app` | ask (escapes cwd) |
 | `curl -o /usr/local/bin/tool ...` | ask (writes outside cwd) |
@@ -734,6 +743,18 @@ Hands-Free Recommendations:
 
   No changes (low confidence — watching):
   - brainstorming: chose simplest over recommended 2x (need 1 more for rule)
+```
+
+**First-time use (no preferences recorded):**
+```
+Hands-Free Recommendations:
+  Not enough data yet to make personalized suggestions.
+  Use hands-free for a few sessions, then run /hands-free recommend again.
+
+  Getting started:
+  - Try: /hands-free full + /hands-free learning high
+  - Watches your choices, no auto-applying until 1x (at high sensitivity)
+  - Run /hands-free recommend after 2-3 sessions for tailored suggestions
 ```
 
 **Smart suggestions include:**
