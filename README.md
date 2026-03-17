@@ -250,6 +250,30 @@ All other hard stops (git push, merge, destructive ops) apply in `full`/`partial
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - Works with [Superpowers](https://github.com/anthropics/claude-code-plugins), custom skills, or any workflow with approval points
 
+## What's new in 2.0
+
+**Security (all modes, no exceptions):**
+- Universal hard stops for pipe-to-shell (`curl | bash`, `wget | sh`, `eval $(curl ...)`)
+- Universal hard stops for privilege escalation (`chmod 777`, `sudo` to system paths)
+- Pre-commit secrets detection (filename patterns + content signals) before every auto-commit
+
+**New commands:**
+- `/hands-free pause` / `/hands-free resume` — suspend without changing mode
+- `/hands-free explain` — trace why the last decision was auto-accepted
+- `/hands-free reset` — clear learned preferences with confirmation
+- `/hands-free dry-run` — preview what would be auto-accepted
+- `/hands-free review-checkpoints on/off` — structured pause before phase transitions
+
+**Automation:**
+- Iteration warnings and mandatory pause at 1 remaining iteration (ralph-loop)
+- Git-log-based loop state detection replaces heuristic guessing
+- Comprehensive auto-commit edge case handling
+
+**Improvements:**
+- Mode transitions, conflict resolution, custom skill integration all documented
+- Preference staleness rules (confidence downgrades on repeated contradictions)
+- Troubleshooting guide for common issues
+
 ## Contributing
 
 PRs welcome. If you find an approval point that hands-free doesn't handle well, open an issue.
