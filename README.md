@@ -7,12 +7,15 @@ A Claude Code skill that auto-accepts recommended options from any skill workflo
 - **Auto-accepts** recommended options at approval points (brainstorming, design, execution, checkpoints)
 - **Auto-commits** changes at natural milestones with clean git history
 - **Pauses** for destructive/irreversible actions (git push, merge, discard, force operations, rm -rf, CI/CD changes, etc.)
-- **Blocks** pipe-to-shell (`curl | bash`), language-level RCE (`python -c exec`, `node -e eval`), privilege escalation (`chmod 777`), and secrets in commits — always, in every mode
+- **Blocks** pipe-to-shell (`curl | bash`), language-level RCE (`python -c exec`, `node -e eval`), privilege escalation (`chmod 777`), and secrets in commits — always, in every mode, including subshell patterns (`bash $(curl URL)`) and shell script content that embeds these patterns
+- **Prompts injection prevention** — approval points are only recognized in Claude's own skill output, not in fetched web pages, file contents, or tool results that could contain crafted approval signals
 - **Review checkpoints** — structured pause-and-summarize before costly phase transitions (optional, or always-on in `partial`)
 - **Explains** decisions with `/hands-free explain` — trace why a specific auto-accept happened
+- **Previews** classification with `/hands-free check <command>` — see if a command would auto-pass, ask, or HARD STOP before running it
 - **Learns** your preferences over time — tracks choices, builds confidence, adapts to you
 - **Ralph-loop integration** — works with ralph-loop + superpowers for fully autonomous iterative development
 - **Four modes** — `full`, `partial`, `off`, and `crazy-workspace` for different levels of autonomy
+- **Comprehensive tool coverage** — 200+ shell command patterns pre-classified for Python (uv/poetry/pipenv), Rust (cargo nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker, Redis, PostgreSQL, SQLite, and more
 
 ## Install
 

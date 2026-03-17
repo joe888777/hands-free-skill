@@ -921,6 +921,7 @@ Example sequence:
 - **Never use** `git commit -a` or `git add -A` / `git add .` — always stage specific files by name
 - If a pre-commit hook fails, announce the failure and pause for user input
 - `git push` is still a **HARD STOP** — auto-commit is local only
+- **Multi-session safety:** If two Claude Code sessions run simultaneously on the same repo, their auto-commits could interleave. Hands-free cannot detect concurrent sessions. If `git add` fails with a `index.lock` error, another session may be mid-commit — announce and pause; do NOT retry automatically (the other session must complete first)
 - If `git status` shows merge conflicts (both-modified files), skip auto-commit entirely and announce: `[auto-commit] Skipping — merge conflicts present. Resolve before committing.`
 
 **Secrets detection — run before every auto-commit (including crazy-workspace, no exceptions):**
@@ -1530,6 +1531,8 @@ When reading `.claude/.ralph-loop.local.md`, handle these failure modes:
 | `iteration` field missing | Assume iteration 1; continue normally |
 | File is malformed YAML/unreadable | Log `[hands-free] Could not read loop state file — running without loop-awareness` and continue |
 | `active: false` | Loop has ended — disable loop-aware mode |
+| Iteration count unexpectedly high (> max_iterations) | Treat as the final iteration; apply iteration-1-remaining pause behavior |
+| `started_at` is from a different day / very old | Warn: `[hands-free] Loop state file appears stale (started N hours/days ago) — verify this is the intended loop`; continue with loop-awareness |
 
 ### Iteration Warnings
 
