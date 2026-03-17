@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.1.0] — 2026-03-17
+
+### Added (iteration 4 — continued from 2.0.0)
+
+**Security**
+- `sudo -s`, `sudo su`, `sudo bash`, `sudo sh` (interactive root shell) → universal HARD STOP
+- Global package install detection: `npm install -g`, `cargo install`, `pip install` without venv → ask (writes outside cwd)
+- Docker volume mount rules: `-v ./:/app` auto-pass; `-v /:/host`, `-v ~/.ssh:/ssh` ask
+- `git config --global/--system` → ask (modifies global git config)
+
+**UX / Commands**
+- `/hands-free` with no argument: activate full mode if not active; show status if already active
+- `/hands-free learning` with no argument: show current level and threshold summary
+- Mode persistence guidance: explains session-scoped reset; how to persist via CLAUDE.md
+- Announcement format table: maps each decision source to its output format (silent, announce, hard stop)
+- Version bumped to 2.1.0; frontmatter description updated to include language-level RCE and global installs
+
+**Shell auto-pass**
+- `nvm`, `rustup` added to always-auto-pass list
+- `pnpm install`, `yarn install` added to always-auto-pass list
+- Remote DB connection string detection: `postgresql://non-localhost` in command line → ask
+- Database migration examples: `sqlx migrate run`, `alembic upgrade head`, `npx prisma migrate dev`, `diesel migration run`
+- Additional examples: `pnpm run build`, `yarn test`, `python -m venv .venv`, `docker run -v ./`, `sudo -s`
+
+**Custom skill integration**
+- Implicit recommendation detection: "I recommend...", "I suggest...", "best option is..." → treated as explicit recommendation
+- Custom skill's own confirmation prompts handled as standard checkpoint approvals
+
+**Ralph Loop**
+- Loop stall prevention: 3 iterations with no new progress → stall warning and mandatory pause
+- Explicit note: does NOT output completion promise unless condition is genuinely true
+
+**Auto-commit**
+- Merge conflict detection blocks auto-commit when conflicts are unresolved
+- `git commit --amend`, `git commit -a`, `git add -A` added to forbidden operations
+- Merge conflict troubleshooting entry added
+
+**`/hands-free explain`**
+- Extended to explain hard stop decisions (not just auto-accept decisions)
+- Shows matched pattern, rule tier, and safe alternative when applicable
+
+**Review Checkpoints**
+- [R] Revise option behavior clarified: prompts user to describe revision, applies it, then re-surfaces checkpoint
+- [S] Stop option announces waiting state and expected resume instruction
+
 ## [2.0.0] — 2026-03-17
 
 ### Added (iteration 3 — same day)

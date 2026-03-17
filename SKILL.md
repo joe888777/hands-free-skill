@@ -1,7 +1,7 @@
 ---
 name: hands-free
-version: 2.0.0
-description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, privilege escalation, and secrets detection in all modes.
+version: 2.1.0
+description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE, privilege escalation, global installs, and secrets detection in all modes.
 ---
 
 # Hands-Free
@@ -30,25 +30,35 @@ Auto-accept recommended options from any skill without pausing. Works with super
 ## Commands
 
 ```
-/hands-free              # full mode (recommended)
-/hands-free full         # same — auto-accept all non-destructive points
+/hands-free              # activate full mode; if already active, show status
+/hands-free full         # full mode — auto-accept all non-destructive points
 /hands-free partial      # auto-accept design only, pause at execution
-/hands-free off          # disable
+/hands-free off          # disable hands-free
 /hands-free crazy-workspace         # approve everything under ./ (5 universal hard stops remain)
 /hands-free auto-commit on    # auto-commit changes at natural milestones
 /hands-free auto-commit off   # disable auto-commit (default)
 /hands-free review-checkpoints on   # pause at major phase transitions for review
 /hands-free review-checkpoints off  # skip phase-transition pauses (default in full)
-/hands-free learning <h/m/l>  # set learning sensitivity
+/hands-free learning <h/m/l>  # set learning sensitivity (h=high, m=medium, l=low)
+/hands-free learning      # show current learning level and thresholds (no arg)
 /hands-free dry-run      # preview what hands-free would auto-accept right now
 /hands-free pause        # temporarily suspend auto-accept without changing mode
 /hands-free resume       # resume auto-accept after a pause
-/hands-free explain      # explain why the last auto-accept decision was made
+/hands-free explain      # explain why the last auto-accept or hard-stop decision was made
 /hands-free recommend    # show recommended settings based on usage
 /hands-free reset        # clear all learned preferences (requires confirmation)
 /hands-free log          # show session decisions
 /hands-free status       # show current mode + all settings
 ```
+
+**Mode persistence:** Hands-free mode is **session-scoped** — it resets at the start of each new conversation. For consistent defaults, add to the project's CLAUDE.md:
+```markdown
+# hands-free overrides
+- Default mode: full
+- Auto-commit: on
+- Learning: high
+```
+This activates those settings at the start of every session without typing `/hands-free full` each time.
 
 ## Recommended Setup
 
