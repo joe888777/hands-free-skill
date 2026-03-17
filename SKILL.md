@@ -195,6 +195,11 @@ Applies to **any skill** — not just superpowers:
 - Checkpoint pause → continue
 - `[Y/n]` or `yes/no` confirmation with `Y` as default → auto-accept `Y` in full mode; ask in partial/off
 - `[y/N]` or `no/yes` confirmation with `N` as default → ask in all modes (the default is "no", so proceed would override the safe default)
+- `[Y/N]` (uppercase both, no clear default) → ask in all modes (cannot determine safe default from case alone)
+- `"Press Enter to continue"` / `"Press any key to continue"` → auto-proceed in full mode (Enter is always safe; no choice being made)
+- `"Enter 'yes' to continue"` (explicit text confirmation) → auto-proceed in full mode (equivalent to [Y/n])
+- `"Type 'yes' to delete"` / `"WARNING: type 'yes' to confirm"` — any prompt with both a warning AND requiring explicit text → ask in all modes (the warning indicates this is high-stakes; the required text signals the system itself wants deliberate confirmation)
+- `"Do you want to continue? [yes/no/abort]"` (3+ options including abort/cancel) → ask in all modes (multi-choice; the presence of an abort option signals the system is cautious)
 
 ### When There Is No Recommended Option
 
@@ -205,6 +210,12 @@ If a skill presents options but marks none as recommended:
 3. Log the choice as an observation in `preferences.md`
 
 Do NOT pause indefinitely just because no recommendation exists. Make a decision, announce it, and continue.
+
+**Destructive first option rule:** If no recommendation exists and the first-listed option has a destructive or warning annotation ("may cause data loss", "irreversible", "WARNING", "this will delete"), skip it and pick the next safe-sounding option as the first-listed fallback. If ALL options have warnings, ask the user — do not auto-pick any option when every choice is flagged as dangerous.
+
+Examples:
+- "Option 1: Overwrite existing files (irreversible) / Option 2: Create backup first" → no recommendation → Option 1 has warning → pick Option 2
+- "Option A: Merge (may conflict) / Option B: Rebase (WARNING: history rewrite)" → no recommendation → both have warnings → ask user
 
 **Explicitly "NOT recommended" options:** If an option is explicitly labeled "not recommended" or "avoid this" (not just unlabeled), treat all other options as the candidate set. If there is only one remaining candidate, auto-pick it. If multiple candidates remain, apply normal "no recommendation" rules (preference → first-listed).
 
