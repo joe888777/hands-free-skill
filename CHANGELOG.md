@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — 2026-03-17
+## [2.0.0] — 2026-03-17
 
 ### Added
 
@@ -54,7 +54,29 @@
 - README commands section: all 16 commands documented including dry-run, pause/resume, explain, reset, review-checkpoints
 - README "What it does": added pipe-to-shell/secrets blocking and review checkpoints; updated "Three modes" to "Four modes"
 
-## [Unreleased] — 2026-03-16
+### Added (continued, later in same day)
+
+- `version: 2.0.0` in frontmatter
+- Troubleshooting section: 5 scenarios (not auto-accepting, blocking unexpectedly, preferences not applying, auto-commit unexpected files, loop exhausted)
+- `/hands-free recommend`: expanded output with override stats, auto-commit suggestion, review-checkpoint trigger; smart suggestion thresholds; `/hands-free recommend promote <action>` subcommand
+- `/hands-free explain`: trace the reasoning behind any auto-accept decision
+- `/hands-free pause` / `/hands-free resume`: temporarily suspend without changing mode
+- `/hands-free reset`: clear all learned preferences with confirmation
+- Session Log: persist note (in-memory only); all 10 event types listed
+- Mode transitions: defined mid-session switching; `partial` auto-enables review-checkpoints
+- Conflict resolution: priority rules for competing skill approval points
+- "When There Is No Recommended Option": fall back to preference → first-listed → log
+- Custom Skill Integration: recognition patterns for non-superpowers skills
+- Preferences scoping, staleness, and "What NOT to record" rules
+- Ralph loop state file edge cases (missing file, null max_iterations, malformed YAML)
+- Iteration-aware commit fallback when `[ralph #N]` tags absent
+- Iteration warnings (print at 3/2 remaining, PAUSE at 1 remaining)
+- Loop state algorithm fallback note when user commits without auto-commit
+- Auto-commit edge cases: 6 scenarios
+- Shell examples: `cargo build`/`make build`/`curl -o ./tool` (auto-pass); `curl|bash`/`chmod 777`/`sudo /etc/` (HARD STOP)
+- Quick Reference table at top of skill
+
+## [1.0.0] — 2026-03-16
 
 ### Changed
 
