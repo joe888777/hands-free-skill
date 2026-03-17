@@ -25,7 +25,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | Auto-commit at milestones | `/hands-free auto-commit on` |
 > | Pause before phase transitions | `/hands-free review-checkpoints on` |
 >
-> **Always blocked (all modes):** `curl|bash`, `source <(curl)`, language RCE (`python -c exec`, `node -e eval`), `chmod 777`, secrets in commits, `rm -rf *`, `rm -rf .git`
+> **Always blocked (all modes):** `curl|bash`, `source <(curl)`, language RCE (`python -c exec`, `node -e eval`, `deno run <url>`), `chmod 777`, secrets in commits, `rm -rf *`, `rm -rf .git`
 
 ## Commands
 
@@ -98,6 +98,7 @@ This activates those settings at the start of every session without typing `/han
 | Git commit (auto-commit on) | auto | auto | ask | auto |
 | Git push | **ask** | **ask** | **ask** | auto |
 | `curl \| bash` / pipe-to-shell | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
+| Language RCE (`python -c exec`, `deno run <url>`) | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
 | `chmod 777` / privilege escalation | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
 | Secrets detected in staged files | **HARD STOP** | **HARD STOP** | **HARD STOP** | **HARD STOP** |
 | Review checkpoint — optional (brainstorming→plan, execution→verify) | skip | **HARD STOP** | **HARD STOP** | skip |
@@ -1039,7 +1040,7 @@ Check in order:
 
 Common causes:
 - The command contains a pipe-to-shell pattern (`| bash`, `| sh`, `source <(curl ...)`) — universal hard stop
-- The command embeds language-level RCE (`python -c "exec(..."`, `node -e "eval(..."`) — universal hard stop
+- The command embeds language-level RCE (`python -c "exec(..."`, `node -e "eval(..."`, `deno run https://...`) — universal hard stop
 - A file path escapes the workspace (`../`, `$HOME`, symlink target)
 - A staged file matches a secrets filename pattern (`.env`, `*.pem`, etc.)
 - A staged diff contains a content signal (`password=`, `AKIA`, `-----BEGIN`)
@@ -1074,6 +1075,14 @@ Auto-commit uses `git add <specific files>` per task — it should never add fil
 - Check if another process modified them
 - Check `git status` before the next auto-commit
 - Use `/hands-free auto-commit off` to disable and commit manually
+
+### "Hands-free blocked `deno run` — I just want to run a local script"
+
+`deno run https://...` is a universal hard stop because Deno can directly fetch and run remote URLs. If running a local file (`deno run ./script.ts` or `deno run src/main.ts`) — that is cwd-scoped and auto-passes. Only `deno run <URL>` (http/https scheme) triggers the hard stop.
+
+### "Hands-free is asking about `terraform apply` / `terraform destroy`"
+
+Both target external infrastructure and are treated as shared/remote state hard stops. `terraform plan` is read-only and auto-passes. To proceed with apply/destroy, confirm the prompt. In crazy-workspace, these still ask because external infrastructure is not within `./`.
 
 ### "The loop stopped at max-iterations without completing"
 
