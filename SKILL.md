@@ -434,8 +434,8 @@ Would PAUSE for:
   git push                            HARD STOP (all modes)
   curl | bash                         HARD STOP (all modes)
   chmod 777                           HARD STOP (all modes)
-  Review checkpoint (pre-execution)   [skip/on — depends on mode + setting]
-  Review checkpoint (pre-push/merge)  HARD STOP (all modes)
+  Review checkpoint (mandatory: pre-execution, pre-push) HARD STOP (all modes, always)
+  Review checkpoint (optional: other transitions)        [skip/HARD STOP — depends on mode + review-checkpoints setting]
   rm -rf *                            HARD STOP (all modes)
   rm -rf .git                         HARD STOP (all modes)
   Secrets in staged files             HARD STOP (all modes)
