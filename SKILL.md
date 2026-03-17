@@ -280,6 +280,8 @@ These tools cannot write to disk, run code, or make side effects, so they are sa
 
 **Note on `off` mode and tool permissions:** Hands-free governs *skill-level approval points* — decision moments where a skill asks the user to choose a path. It does not intercept Claude Code's tool execution system. Claude Code's own permission settings (auto-approve mode, sandbox mode) govern whether individual tool calls need user approval at the system level. Hands-free `off` means: "at every skill decision point, pause and ask" — not "block every tool call".
 
+**MCP tool calls:** When Claude Code has MCP (Model Context Protocol) servers active, their tools are treated by hands-free as follows: MCP read operations (fetching data, listing resources) → auto-pass in full mode (equivalent to read-only tools). MCP write operations (creating pages, posting messages, modifying records) → treat as shared/remote state → ask in all modes. If an MCP tool's purpose cannot be determined from its name, ask before proceeding.
+
 ## Write-Capable Tool Rules
 
 **Edit** and **Write** tools (file modification) follow the same rules as shell commands scoped to the workspace:
@@ -553,7 +555,7 @@ When enabled (`/hands-free auto-commit on`), automatically commit changes at nat
 
 ### How It Works
 
-1. Stage only the relevant changed files (`git add <specific files>`) — never `git add -A` or `git add .`
+1. Stage only the relevant changed files (`git add <specific files>`) — never `git add -A` or `git add .`. "Relevant files" = files that were modified as part of the current task being committed; determined by tracking which files Claude edited or created during the current task. Do NOT stage: files you don't know the purpose of, files still under active work, or files that belong to a different logical unit.
 2. Determine commit message style: run `git log --oneline -5` to see recent messages; match the format (e.g., if repo uses `feat:` / `fix:` prefixes, use those; if it uses plain sentences, match that)
 3. Write a concise commit message following that style
 4. Announce: "Auto-committed: `<short message>`"
