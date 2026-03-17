@@ -643,6 +643,66 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `eslint --fix ./src` → auto-pass (cwd-scoped auto-fix)
   - `eslint --fix-dry-run ./src` → auto-pass (read-only fix preview)
   - `asdf install`, `asdf plugin add` → ask (writes to `~/.asdf/` — outside cwd); `asdf list`, `asdf current` → auto-pass (read-only)
+- **Stripe CLI:**
+  - `stripe listen` → auto-pass (forwards webhooks to local server; read-only from Stripe's perspective)
+  - `stripe logs tail` → auto-pass (streams API logs; read-only)
+  - `stripe events resend <event-id>` → ask (replays event to remote endpoint — external write)
+  - `stripe trigger <event>` → ask (creates a test event on Stripe — external side effect)
+  - `stripe login` → ask (OAuth to Stripe — writes credentials to `~/.config/stripe`)
+  - `stripe resources list` / `stripe <resource> retrieve <id>` → auto-pass (read-only API inspection)
+  - `stripe fixtures ./tests/fixture.json` → auto-pass (runs local fixture file against test mode Stripe)
+- **Supabase CLI:**
+  - `supabase start` → auto-pass (starts local Supabase Docker stack; localhost only)
+  - `supabase stop` → auto-pass (stops local Docker stack; reverses `supabase start`)
+  - `supabase status` → auto-pass (read-only local service status)
+  - `supabase migration new <name>` → auto-pass (creates migration file in `./supabase/migrations/`; cwd-scoped)
+  - `supabase migration list` → auto-pass (read-only)
+  - `supabase db reset` → ask (drops and re-creates the local DB; destructive data loss)
+  - `supabase db push` → ask (pushes local schema to a remote Supabase project — external)
+  - `supabase db pull` → ask (overwrites local schema from remote — modifies cwd files potentially destructively)
+  - `supabase functions serve` → auto-pass (local edge function dev server; localhost only)
+  - `supabase functions deploy` → ask (deploys to Supabase cloud — external)
+  - `supabase link` → ask (links local project to remote Supabase project — writes config)
+  - `supabase gen types typescript --local` → auto-pass (generates TypeScript types from local DB; cwd-scoped)
+- **Firebase CLI:**
+  - `firebase emulators:start` → auto-pass (starts local Firebase emulator suite; localhost only)
+  - `firebase emulators:exec <cmd>` → classify by `cmd` (wrapper rule)
+  - `firebase deploy` → ask (deploys to Firebase cloud — external shared state)
+  - `firebase deploy --only functions` / `--only hosting` → ask (partial deploy — still external)
+  - `firebase functions:log` → auto-pass (read-only log stream from cloud)
+  - `firebase open` → ask (opens browser to Firebase console — external; may trigger actions)
+  - `firebase use <alias>` → ask (changes active Firebase project — affects all subsequent commands)
+  - `firebase logout` / `firebase login` → ask (OAuth credential management)
+- **Vercel CLI:**
+  - `vercel dev` → auto-pass (local dev server; localhost only)
+  - `vercel build` → auto-pass (builds project locally; cwd-scoped output in `.vercel/output/`)
+  - `vercel deploy` / `vercel deploy --prod` → ask (deploys to Vercel cloud — external)
+  - `vercel env ls` / `vercel env pull` → ask (`env pull` writes `.env.local` with remote secrets); `env ls` → auto-pass (read-only)
+  - `vercel logs <url>` → auto-pass (read-only deployment logs)
+  - `vercel link` → ask (links cwd to a Vercel project — writes `.vercel/project.json`)
+  - `vercel login` / `vercel logout` → ask (OAuth credential management)
+- **Netlify CLI:**
+  - `netlify dev` → auto-pass (local dev server; localhost only)
+  - `netlify build` → auto-pass (builds project locally; cwd-scoped)
+  - `netlify deploy` → ask (deploys to Netlify cloud — external)
+  - `netlify deploy --prod` → ask (production deploy — especially impactful)
+  - `netlify status` → auto-pass (read-only local/remote status)
+  - `netlify link` → ask (links cwd to a Netlify site)
+  - `netlify login` → ask (OAuth credential management)
+  - `netlify env:list` → auto-pass (read-only); `netlify env:set / env:unset` → ask (modifies remote env vars)
+- **Railway CLI:**
+  - `railway status` / `railway list` / `railway logs` → auto-pass (read-only)
+  - `railway up` → ask (deploys to Railway — external)
+  - `railway run <cmd>` → ask (runs command with remote Railway env vars injected — external secrets)
+  - `railway link` → ask (links to remote Railway project); `railway login` → ask
+- **Fly.io CLI (`flyctl` / `fly`):**
+  - `fly status`, `fly logs`, `fly info` → auto-pass (read-only inspection)
+  - `fly deploy` → ask (deploys to Fly.io — external)
+  - `fly launch` → ask (creates a new Fly.io app — external)
+  - `fly scale` / `fly autoscale` → ask (modifies instance count — external)
+  - `fly secrets set` → ask (writes secrets to Fly.io — external); `fly secrets list` → auto-pass
+  - `fly ssh console` → ask (opens SSH into a remote VM)
+  - `fly proxy` → auto-pass (local port forward to remote app; read-only local side)
 - `gh` (GitHub CLI) read operations → auto-pass: `gh issue list`, `gh pr list`, `gh pr view`, `gh repo view`, `gh run list`, `gh run view`, `gh run watch`, `gh workflow list`, `gh workflow view`, `gh gist view`, `gh gist list`, `gh api <endpoint>` (GET only), `gh repo list`, `gh label list`, `gh tag list`, `gh search issues/prs/repos`
 - `gh` (GitHub CLI) write operations → ask (shared/remote state): `gh issue create`, `gh pr create`, `gh pr merge`, `gh pr close`, `gh issue close`, `gh pr review`, `gh release create`, `gh workflow run`, `gh workflow enable/disable`, `gh gist create`, `gh gist edit`, `gh repo fork`, `gh repo create`, `gh api <endpoint>` (POST/PUT/DELETE), `gh pr comment`, `gh issue comment`, `gh pr edit`, `gh issue edit`
 - `gh pr checkout <number>` → ask in partial (checks out remote PR branch, changes local branch state); auto-pass in full (equivalent to `git fetch` + `git checkout`)
@@ -2397,6 +2457,26 @@ Scripts with names not in the known-safe list (`test`, `build`, `lint`, `format`
 ### "`conda create` / `conda install` is being blocked"
 
 `conda create` and `conda install` write to `~/.conda/` (outside cwd), so they always ask — even in crazy-workspace, which only overrides within `./`. This is intentional: conda environments are shared across projects and system-wide installs can affect other workflows. To proceed: confirm the prompt. For project-isolated Python environments, consider `uv venv .venv` or `python -m venv .venv` instead (both cwd-scoped and auto-pass).
+
+### "`stripe listen` is auto-passing but `stripe trigger` is blocked"
+
+`stripe listen` is a read-only forwarding tunnel — it doesn't create or modify Stripe objects, it just proxies webhook events to your localhost. `stripe trigger` sends a real event to the Stripe API, which can cause side effects (emails, webhooks firing to other endpoints, charge records). Confirm `trigger` prompts explicitly.
+
+### "`supabase db push` is blocked — I want to deploy my migration"
+
+`supabase db push` sends your local schema to a remote Supabase project and may run destructive migrations. Always run `supabase db diff` first (auto-pass, read-only diff against remote) to review changes before pushing. This is intentional: remote DB schema changes are not easily reversible.
+
+### "`vercel env pull` is blocked"
+
+`vercel env pull` writes your remote Vercel environment variables (which may include production secrets) to a local `.env.local` file. This is blocked because it can pull live secrets into the local filesystem where they might accidentally be committed. Review the output, add `.env.local` to `.gitignore`, then confirm the pull prompt.
+
+### "`firebase use staging` is being blocked"
+
+`firebase use <alias>` changes the active Firebase project for ALL subsequent `firebase` commands. This is a global state change that could cause the next `firebase deploy` to target the wrong project. Hands-free asks to ensure you're intentionally switching contexts. After confirming, all subsequent commands target the new project.
+
+### "`railway run cargo test` is blocked"
+
+`railway run` injects remote Railway environment variables (including secrets) into the command's environment. Even for a local command like `cargo test`, it first connects to Railway to fetch env vars. This is classified as ask because it involves remote secret retrieval. To run tests with Railway env vars, confirm the prompt. For local-only runs, use `cargo test` directly.
 
 ### "`ansible-playbook` is being blocked — I'm running against localhost"
 

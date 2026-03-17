@@ -176,7 +176,7 @@
 - `/hands-free recommend prune` added to commands list
 - `/hands-free log --full` noted in commands
 
-### Added (iteration 10 — batch 41)
+### Added (iteration 10 — batch 41–42)
 
 **IaC and cloud provisioning tools**
 - Pulumi: `preview/stack ls/stack output` → auto; `up/destroy/refresh/import` → ask
@@ -204,7 +204,21 @@
 **Container alternatives**
 - Podman and nerdctl: same rules as Docker equivalents (build/run/ps/inspect → auto; push/login/logout → ask)
 
+**SaaS service CLIs (batch 42)**
+- Stripe CLI: `listen/logs tail` → auto; `trigger/events resend/login` → ask; `fixtures` → auto
+- Supabase CLI: `start/stop/status/migration new/gen types --local` → auto; `db push/pull/reset/functions deploy/link` → ask
+- Firebase CLI: `emulators:start` → auto; `deploy/use/login` → ask; `functions:log` → auto
+- Vercel CLI: `dev/build` → auto; `deploy/link/login` → ask; `env ls` → auto; `env pull` → ask
+- Netlify CLI: `dev/build/status` → auto; `deploy/link/login/env:set` → ask; `env:list` → auto
+- Railway CLI: `status/list/logs` → auto; `up/run/link/login` → ask
+- Fly.io (`flyctl`): `status/logs/info/proxy` → auto; `deploy/launch/scale/ssh console/secrets set` → ask
+
 **Troubleshooting entries**
+- `stripe listen` vs `stripe trigger` distinction
+- `supabase db push` blocking (schema changes to remote)
+- `vercel env pull` blocking (pulls live secrets to local)
+- `firebase use` blocking (changes active project context)
+- `railway run` blocking (injects remote secrets)
 - `ansible-playbook` blocked even on localhost (external SSH execution)
 - `cdk synth` vs `cdk deploy` distinction
 - `pulumi preview` vs `pulumi refresh` distinction
