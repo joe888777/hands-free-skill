@@ -251,6 +251,10 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 - `rustup` — Rust toolchain manager (`rustup update`, `rustup target add`, `rustup component add`, etc.)
 - `git init` — initializing a repo
 - `git add` — staging files (not destructive)
+- `git checkout -b <branch>` — creating a new local branch (non-destructive)
+- `git branch <name>` — creating a new local branch
+- `git stash` / `git stash pop` — stashing and restoring work (recoverable)
+- `git log`, `git status`, `git diff`, `git show` — read-only git inspection
 - `cd` within the workspace — changing into any subdirectory of the current workspace
 - `pnpm install` / `yarn install` — package manager installs (cwd-scoped; equivalent to `npm install`)
 
@@ -515,9 +519,14 @@ If hands-free is off:
 
 ```
 Hands-Free Status
-  Mode: off (inactive)
+  Mode:       off (inactive)
+  Learning:   high (still tracking choices — use /hands-free full to apply them)
+  Preferences loaded: 2 rules (1 high, 1 medium)
+
   To activate: /hands-free full
 ```
+
+In `off` mode, learning continues tracking choices but no auto-accept or auto-commit happens. Preferences accumulate for when the mode is re-enabled.
 
 ## `/hands-free dry-run`
 
@@ -603,7 +612,7 @@ In `full` and `crazy-workspace` modes, review checkpoints are **skipped by defau
 /hands-free review-checkpoints off  # skip (default in full mode)
 ```
 
-In `partial` mode, review checkpoints are **always on** (they align with the existing "pause at execution" behavior).
+In `partial` mode, optional review checkpoints are **always on** and cannot be disabled — `/hands-free review-checkpoints off` is ignored in partial mode. Partial mode is designed for cautious operation; the checkpoints are part of that guarantee. To disable optional checkpoints, switch to `full` mode first.
 
 ### Checkpoint Output Format
 
