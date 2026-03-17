@@ -116,7 +116,21 @@ Switching modes mid-session takes effect immediately for all future approval poi
 
 ## Core Rule
 
-When active, MUST auto-proceed with the recommended option. Do NOT pause, present options, or wait. **Announce, don't ask:** "Going with approach 2 (recommended) — [reason]" and continue.
+When active, MUST auto-proceed with the recommended option. Do NOT pause, present options, or wait. **Announce, don't ask:** state the decision, the source, and continue immediately.
+
+**Announcement formats by source:**
+
+| Source | Announcement format |
+|---|---|
+| Skill recommendation | `Going with [option] (recommended) — [1-line reason]` |
+| Learned preference (high) | `Going with [option]` *(silent — no announcement)* |
+| Learned preference (medium) | `Going with [option] (your preference)` |
+| First-listed fallback | `Going with [option] (first listed — no recommendation)` |
+| Auto-commit | `[auto-commit] [commit message]` |
+| Hard stop | `[HARD STOP] [rule that triggered] — pausing for input` |
+| Review checkpoint | `--- Review Checkpoint: [Phase] Complete ---` *(full block)* |
+
+Keep announcements to one line maximum unless it's a review checkpoint (which uses the structured block format). Do not explain at length — announce and proceed.
 
 ### Conflict Resolution
 
@@ -154,7 +168,14 @@ Hands-free works with any skill that presents approval points, not just superpow
 - A numbered choice like "1. Option A  2. Option B (recommended)" → pick the recommended one
 - Any request for the user to choose between paths forward → apply current mode rules
 
+**Implicit recommendations** — when a skill says something like "I recommend approach 1, but you can choose":
+- Treat it as an explicit recommendation for approach 1 → auto-pick it
+- If the wording is "I suggest" / "I'd recommend" / "best option is" / "my preference is" → treat as recommendation
+- If genuinely ambiguous ("either would work"), treat as no recommendation → apply "When There Is No Recommended Option" rules
+
 If a custom skill's approval point matches a hard stop pattern (destructive action, secrets, etc.), the hard stop takes precedence over the approval point.
+
+**Custom skill's own "are you sure?" prompts:** If a custom skill has its own internal confirmation prompt (e.g., "This will delete all temp files. Continue?"), hands-free treats it as a standard checkpoint approval. In full mode: auto-approve. In partial mode: depends on whether it's execution-type (ask) or other (auto). Hard stop patterns still take precedence.
 
 ### When You Must Pause and Ask
 
@@ -216,9 +237,12 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 ### Always auto-pass (regardless of paths)
 
 - `pyenv` — any pyenv subcommand (`pyenv install`, `pyenv local`, `pyenv global`, etc.)
+- `nvm` — Node Version Manager (`nvm use`, `nvm install`, `nvm alias`, etc.)
+- `rustup` — Rust toolchain manager (`rustup update`, `rustup target add`, `rustup component add`, etc.)
 - `git init` — initializing a repo
 - `git add` — staging files (not destructive)
 - `cd` within the workspace — changing into any subdirectory of the current workspace
+- `pnpm install` / `yarn install` — package manager installs (cwd-scoped; equivalent to `npm install`)
 
 ### Auto-pass when scoped to current directory
 
@@ -256,6 +280,10 @@ digraph {
 | `git add src/main.py` | auto-pass |
 | `cd src/subdir` | auto-pass (within workspace) |
 | `npm install` | auto-pass (cwd-scoped) |
+| `pnpm install` | auto-pass (cwd-scoped) |
+| `yarn install` | auto-pass (cwd-scoped) |
+| `pnpm run build` | auto-pass (cwd-scoped) |
+| `yarn test` | auto-pass (cwd-scoped) |
 | `python -m pytest tests/` | auto-pass (cwd-scoped) |
 | `python -m mypy src/` | auto-pass (cwd-scoped, type check) |
 | `python -m ruff check .` | auto-pass (cwd-scoped, lint) |
