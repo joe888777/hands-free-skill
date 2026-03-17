@@ -292,6 +292,7 @@ In `full`, `partial`, and `crazy-workspace` modes, auto-approve Bash/shell tool 
 - `git submodule update --init` / `git submodule update --init --recursive` — initializes and updates submodules (read-mostly; fetches from remotes but only writes within `./`)
 
 Note: `git restore <file>` (without `--staged`) DISCARDS local changes and is NOT auto-pass — ask first.
+Note: `git clone <url>` downloads a remote repo but writes only within cwd, making it cwd-scoped → auto-pass. No code is executed during cloning.
 Note: `git tag -d <name>` (delete) and `git push --tags` are NOT auto-pass — deletion is destructive, push is remote.
 Note: `git worktree remove <path>` is NOT auto-pass — destructive (removes the worktree directory).
 
@@ -361,11 +362,19 @@ digraph {
 | `cargo clippy` | auto-pass (cwd-scoped) |
 | `cargo fmt` | auto-pass (cwd-scoped, format) |
 | `cargo fmt --check` | auto-pass (cwd-scoped, format check) |
+| `cargo check` | auto-pass (cwd-scoped, type check without build) |
+| `cargo run` | auto-pass (cwd-scoped, runs the current crate) |
+| `cargo doc` | auto-pass (cwd-scoped, generates docs) |
+| `cargo bench` | auto-pass (cwd-scoped, runs benchmarks) |
 | `cargo sqlx prepare` | auto-pass (cwd-scoped) |
 | `make build` | auto-pass (cwd-scoped) |
 | `npx tsc --noEmit` | auto-pass (cwd-scoped, type check) |
+| `tsc --build` | auto-pass (cwd-scoped, TypeScript build) |
+| `tsc --watch` | auto-pass (cwd-scoped, TypeScript watch) |
 | `npx eslint src/` | auto-pass (cwd-scoped, lint) |
 | `npx vitest run` | auto-pass (cwd-scoped, test) |
+| `pnpm dlx create-next-app my-app` | auto-pass (cwd-scoped, equivalent to npx) |
+| `bunx prisma generate` | auto-pass (cwd-scoped, equivalent to npx) |
 | `bun run test` | auto-pass (cwd-scoped) |
 | `bun run build` | auto-pass (cwd-scoped) |
 | `bun install` | auto-pass (cwd-scoped, equivalent to npm install) |
@@ -406,6 +415,8 @@ digraph {
 | `cargo install cargo-watch` | ask (writes to ~/.cargo/bin) |
 | `pip install requests` | ask (no venv detected, would write to system Python) |
 | `python -m venv .venv` | auto-pass (creates venv in cwd) |
+| `pip install -e .` (venv active) | auto-pass (editable install into active venv) |
+| `pip install -e .` (no venv) | ask (installs to system/user Python — outside cwd) |
 | `docker run -v ./:/app node:20 npm test` | auto-pass (mounts cwd) |
 | `docker run -v /:/host ubuntu bash` | ask (mounts root filesystem) |
 | `git config --global user.email "me@example.com"` | ask (modifies global git config) |
