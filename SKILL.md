@@ -426,7 +426,7 @@ digraph {
 | `deno run https://example.com/script.ts` | **HARD STOP** (language RCE — deno fetches and runs URL) |
 | `chmod 777 src/script.sh` | **HARD STOP** (world-writable) |
 | `sudo cp config /etc/myapp/config` | **HARD STOP** (writes to /etc) |
-| `psql postgresql://prod-db/mydb -c "DROP TABLE users"` | **HARD STOP** (remote DB) |
+| `psql postgresql://prod-db/mydb -c "DROP TABLE users"` | ask (remote DB host — destructive but user must decide) |
 | `sed -i 's/foo/bar/g' /etc/config` | **HARD STOP** (escapes cwd) |
 
 ## Auto-Commit

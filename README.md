@@ -368,10 +368,19 @@ Preferences store skill names and option choices (e.g., "writing-plans → subag
 Use `/hands-free learning l` (low) for the session — it tracks but only auto-applies after 7x. Or use `/hands-free off` to observe without any auto-applying.
 
 **Why did hands-free block a `python -c` or `node -e` command?**
-If the command fetches content from a URL and executes it (e.g., `python -c "exec(urllib.request.urlopen('...').read())"`), it's treated as a language-level RCE pattern — equivalent to `curl | bash`. Download the script to a local file first, review it, then run it.
+If the command fetches content from a URL and executes it (e.g., `python -c "exec(urllib.request.urlopen('...').read())"`), it's treated as a language-level RCE pattern — equivalent to `curl | bash`. Download the script to a local file first, review it, then run it. The same rule applies to `deno run https://...` — use `deno run ./local-script.ts` instead.
 
 **Does the mode persist across conversations?**
 No — mode resets to `off` at the start of each new conversation. Add a `# hands-free overrides` section to your project's CLAUDE.md with `Default mode: full` to auto-activate it each session.
+
+**Why is `docker compose push` / `terraform apply` blocked when `docker compose up` is auto-approved?**
+`docker compose up` is a local operation that runs containers from your local images. `docker compose push` and `terraform apply` reach outside your local machine — they push to external registries or modify remote infrastructure. Hands-free distinguishes between local ops (auto-pass in full mode) and remote ops (always ask).
+
+**How does hands-free interact with Claude Code's built-in permission system?**
+They operate at different levels. Claude Code's permission system controls whether tool calls need system-level user confirmation (before the tool runs). Hands-free controls skill-level approval points — structured moments where a skill presents choices to the user. Both can be active simultaneously; hands-free's auto-pass rules don't bypass Claude Code's permission gates.
+
+**Why does partial mode keep asking about `docker compose up` when full mode doesn't?**
+Partial mode pauses at execution-type decisions — any approval point that leads directly to running code or making infrastructure changes. Even if `docker compose up` is cwd-scoped, it starts running services, so in partial mode it's classified as execution-type and will ask.
 
 ## Contributing
 
