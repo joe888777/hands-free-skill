@@ -1125,6 +1125,44 @@ Recognized dry-run flags (case-insensitive, any position in the command):
 - If the base command is a HARD STOP (e.g., pipe-to-shell, `chmod 777`), the dry-run flag does NOT change the classification.
 - When in doubt about whether `--dry-run` is a true no-op for an unlisted tool, use ask.
 
+**`--version` / `--help` / `-V` detection (meta-rule):** Any command invoked with ONLY `--version`, `-V`, `--help`, or `-h` is read-only and always auto-passes, regardless of what the base command is. These flags cause the tool to print info and exit without performing any operation.
+- `flyway --version` → auto-pass (even though `flyway migrate` would ask)
+- `terraform --version` → auto-pass
+- `kubectl --help` → auto-pass
+- `cdk --version` → auto-pass
+- Exception: if `--version` is combined with other flags that perform actions, classify by the most restrictive other flag
+
+**`--force` / `--overwrite` / `-f` escalation rule:** If a command would normally auto-pass WITHOUT `--force`/`--overwrite`, adding `--force` or `-f` (when used as a force/overwrite flag) escalates to ask. The force flag signals that the user is overriding a safety check — hands-free should honor that check too.
+- `git clean -fd` → ask (already ask; `--force` is required by git clean)
+- `helm upgrade myapp ./chart --force` → ask (`--force` deletes and recreates resources instead of patching)
+- `npm audit fix --force` → ask (already listed; force installs breaking changes)
+- `pip install --upgrade --force-reinstall package` → ask in full if package is known; auto in some cases
+- `kubectl replace -f ./manifest.yaml --force` → ask (deletes and recreates the resource)
+- Exception: `-f` as a "file" flag (e.g., `kubectl apply -f ./manifest.yaml`) is NOT a force flag — classify by the base command
+- When in doubt: if the `--force` flag is semantically "skip safety check" or "override existing", escalate to ask
+
+**`-r` / `--recursive` with destructive commands escalation:** Recursive flags applied to destructive commands make the scope of destruction much larger. Apply ask to any destructive operation with a recursive flag, even if the non-recursive version would auto-pass.
+- `chmod +x ./script.sh` → auto-pass; `chmod +x -R ./src/` → auto-pass (non-destructive permission grant)
+- `rm -rf ./dist` → ask (already requires confirmation; recursive + force)
+- `rsync -r ./src/ ./backup/` → auto-pass (both cwd-scoped; rsync `-r` is standard)
+- `git clean -r ./temp/` → ask (recursively removes untracked files)
+
+**Output destination rule (`--output` / `-o` / redirection):** When a command writes output to a file, classify by BOTH the command AND the output destination:
+- If the command auto-passes AND output destination is within cwd → auto-pass
+- If the command auto-passes BUT output destination escapes cwd → ask
+- If the command would ask → ask (regardless of output destination)
+- This applies to `--output ./file`, `-o ./file`, `> ./file`, and `--out ./dir`
+- `go doc fmt > ./docs/fmt.txt` → auto-pass (both command and dest are cwd-scoped)
+- `bazel build //... > /tmp/build.log` → ask (dest escapes cwd, even though build auto-passes)
+- `terraform plan -out=./tfplan` → auto-pass (writing plan file to cwd; `terraform plan` already auto-passes)
+
+**Config file sourcing rule (`--config` / `-c` / `--file`):** When a command reads a config file via a flag:
+- Config file within cwd → classify by the base command
+- Config file outside cwd → ask (the config could redirect the tool to operate on external paths)
+- `flyway migrate -configFiles=./flyway.conf` → ask (flyway migrate would ask regardless)
+- `eslint --config ./.eslintrc.json ./src` → auto-pass (cwd config, cwd target)
+- `kubectl apply --kubeconfig=/home/user/.kube/config` → ask (escapes cwd; also modifies cluster)
+
 **Compound command rule:** For shell commands with `&&`, `||`, or `;` operators, classify by the most restrictive component. If any component would be a HARD STOP → HARD STOP. If any component would ask → ask. Only auto-pass if ALL components independently auto-pass.
 
 **Trivially safe commands in compounds:** The following commands are considered transparent and do NOT elevate the classification of a compound: `echo`, `printf`, `true`, `false`, `exit`, `read`, `sleep`, `date`, `pwd`, `ls`, `cat` (reading cwd files). If a compound contains ONLY these plus auto-pass commands, the compound auto-passes. Example: `echo "Building..." && cargo build` → auto-pass (echo is transparent).
