@@ -930,7 +930,7 @@ A stall is defined as: the same set of failing tests OR the same set of files mo
 
 `/hands-free crazy-workspace` unlocks maximum-autonomy mode scoped to `./` (the current working directory). Designed for sandboxed environments, throwaway repos, or any workspace where speed matters more than caution.
 
-> **Warning:** Do NOT use crazy-workspace on production repositories, shared codebases, or any repo where accidental force-pushes, destructive resets, or unreviewed merges could impact others. The 5 universal hard stops (pipe-to-shell, chmod 777, secrets, rm -rf *, rm -rf .git) remain, but everything else is auto-approved without prompting.
+> **Warning:** Do NOT use crazy-workspace on production repositories, shared codebases, or any repo where accidental force-pushes, destructive resets, or unreviewed merges could impact others. Universal hard stops (pipe-to-shell, language RCE, chmod 777, secrets, rm -rf *, rm -rf .git) and mandatory review checkpoints remain, but everything else within `./` is auto-approved without prompting.
 
 ### Activation
 
@@ -941,6 +941,7 @@ A stall is defined as: the same set of failing tests OR the same set of files mo
 ### Behavior
 
 - **Auto-approve everything local and within `./`** — git push, merges, resets, force ops, destructive file edits, file deletions, package changes, CI/CD workflow file edits — all auto-accepted
+- **Mandatory review checkpoints still fire** — the two mandatory HARD STOPs (before execution starts, before push/merge) fire in crazy-workspace just like any other mode. After the user confirms [C] Continue, the subsequent git push / merge then auto-executes without an additional confirmation. The checkpoint is distinct from the action.
 - **Absolute hard stops** (no exceptions, no override, even in crazy-workspace):
   - `rm -rf *` — wipes everything indiscriminately
   - `rm -rf .git` — destroys version history
