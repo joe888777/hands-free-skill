@@ -577,6 +577,57 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `az webapp up`, `az functionapp deploy`, `az container create` → ask (deploys to cloud)
   - `az vm start/stop/deallocate` → ask (modifies VM state)
   - `az storage blob list` → auto-pass (read-only); `az storage blob upload` → ask (writes to remote)
+- **Pulumi (IaC):**
+  - `pulumi preview` → auto-pass (read-only plan, no changes made)
+  - `pulumi stack ls`, `pulumi stack output` → auto-pass (read-only)
+  - `pulumi config get <key>` → auto-pass (read config value); `pulumi config set <key> <value>` → ask (modifies stack config)
+  - `pulumi up` → ask (applies infrastructure changes — shared/remote state)
+  - `pulumi destroy` → ask (destroys all infrastructure in the stack — irreversible)
+  - `pulumi refresh` → ask (reconciles stack state with cloud — may modify state file)
+  - `pulumi import` → ask (imports existing cloud resource into stack state)
+- **AWS CDK (Cloud Development Kit):**
+  - `cdk ls`, `cdk diff` → auto-pass (read-only listing and diff of changes)
+  - `cdk synth` → auto-pass (synthesizes CloudFormation templates to cdk.out/; cwd-scoped)
+  - `cdk deploy` → ask (deploys infrastructure to AWS — shared/remote state)
+  - `cdk destroy` → ask (removes infrastructure from AWS — irreversible)
+  - `cdk bootstrap` → ask (creates CDK bootstrap resources in AWS account)
+- **Ansible:**
+  - `ansible-playbook <playbook.yml> --check` → auto-pass (dry run, no changes applied)
+  - `ansible-playbook <playbook.yml> --syntax-check` → auto-pass (syntax validation only)
+  - `ansible-playbook <playbook.yml>` → ask (executes playbook on remote hosts via SSH)
+  - `ansible <host-pattern> -m ping` → ask (connects to remote hosts)
+  - `ansible-inventory --list`, `ansible-inventory --graph` → auto-pass (read-only inventory inspection)
+  - `ansible-lint ./playbook.yml` → auto-pass (cwd-scoped static analysis)
+  - `ansible-vault encrypt ./vault.yml` → ask (encrypts a file in-place, potentially sensitive content); `ansible-vault view` → auto-pass (read-only decrypted view)
+- **Database migration tools (non-ORM):**
+  - **Flyway:** `flyway info` → auto-pass (read-only migration status); `flyway migrate` → ask (applies pending migrations to DB); `flyway baseline` → ask (marks DB as migrated); `flyway repair` → ask (fixes migration checksums); `flyway clean` → ask (drops all objects in schema — destructive)
+  - **Liquibase:** `liquibase status` / `liquibase history` → auto-pass (read-only); `liquibase update` → ask (applies changesets to DB); `liquibase rollback` → ask (destructive rollback); `liquibase drop-all` → ask (drops all objects — very destructive)
+  - **Knex:** `knex migrate:status` / `knex migrate:list` → auto-pass (read-only); `knex migrate:latest` → ask (applies pending migrations); `knex migrate:rollback` → ask (reverts last batch); `knex seed:run` → ask (inserts seed data, modifies DB state)
+  - **Alembic:** `alembic current` / `alembic history` → auto-pass (read-only); `alembic upgrade head` → ask (applies all pending migrations); `alembic downgrade -1` → ask (reverts last migration — destructive)
+- **SSH key management:**
+  - `ssh-add ~/.ssh/id_rsa` → ask (adds key to ssh-agent — modifies agent state, writes outside cwd)
+  - `ssh-add -l` / `ssh-add -L` → auto-pass (read-only, lists loaded keys)
+  - `ssh-add -d ~/.ssh/id_rsa` → ask (removes key from agent)
+  - `ssh-keyscan github.com >> ~/.ssh/known_hosts` → ask (writes to `~/.ssh/known_hosts` outside cwd)
+  - `ssh-keyscan github.com` (stdout only) → auto-pass (read-only fingerprint output)
+  - `ssh-copy-id user@host` → ask (appends public key to remote host's `~/.ssh/authorized_keys`)
+  - `ssh-keygen -t ed25519 -f ./deploy_key` → auto-pass (generates key to cwd path); `ssh-keygen -t ed25519` (no `-f`, defaults to `~/.ssh/`) → ask (writes outside cwd)
+- **Go extended tools:**
+  - `go generate ./...` → ask (runs `//go:generate` directives which can execute arbitrary commands)
+  - `go doc <package>` / `go doc <package>.<symbol>` → auto-pass (read-only documentation lookup)
+  - `go mod download` → auto-pass (downloads modules to local cache; no cwd writes)
+  - `go mod verify` → auto-pass (read-only, verifies module checksums)
+  - `go mod graph` → auto-pass (read-only dependency graph)
+  - `go env` → auto-pass (read-only environment inspection)
+  - `go list ./...` → auto-pass (read-only package listing)
+  - `go build -o ./bin/app ./cmd/app` → auto-pass (cwd-scoped compilation)
+  - `go install <package>@<version>` → ask (installs binary to `$GOPATH/bin` — outside cwd)
+- **Container alternatives (Podman, nerdctl):**
+  - `podman build ./`, `podman images`, `podman ps`, `podman inspect` → auto-pass (same rules as docker equivalents)
+  - `podman run --rm <well-known-image>` → auto-pass in full (same image familiarity rule as docker)
+  - `podman push`, `podman login`, `podman logout` → ask (same rules as docker push/login/logout)
+  - `nerdctl build`, `nerdctl run`, `nerdctl ps` → auto-pass (cwd-scoped, same rules as docker)
+  - `nerdctl push`, `nerdctl login` → ask (same as docker push/login)
 - **Release management tools:**
   - `semantic-release --dry-run`, `npx semantic-release --dry-run` → auto-pass (read-only preview)
   - `semantic-release` / `npx semantic-release` (without `--dry-run`) → ask (publishes releases to npm/GitHub — external)
@@ -2346,6 +2397,34 @@ Scripts with names not in the known-safe list (`test`, `build`, `lint`, `format`
 ### "`conda create` / `conda install` is being blocked"
 
 `conda create` and `conda install` write to `~/.conda/` (outside cwd), so they always ask — even in crazy-workspace, which only overrides within `./`. This is intentional: conda environments are shared across projects and system-wide installs can affect other workflows. To proceed: confirm the prompt. For project-isolated Python environments, consider `uv venv .venv` or `python -m venv .venv` instead (both cwd-scoped and auto-pass).
+
+### "`ansible-playbook` is being blocked — I'm running against localhost"
+
+Even `ansible-playbook ... --limit localhost` makes SSH connections to execute modules on the target machine. This is still an external operation (modifies system state). Only `--check` (dry run) and `--syntax-check` auto-pass. If you're certain the playbook is local-only, confirm the prompt. Add a CLAUDE.md override for a specific playbook if you always want it to auto-pass in your dev environment.
+
+### "`cdk synth` is auto-passing but `cdk deploy` is blocked"
+
+This is intentional. `cdk synth` writes CloudFormation templates to `cdk.out/` within the current directory — it's cwd-scoped and safe to run. `cdk deploy` sends those templates to AWS and creates/modifies real infrastructure. The latter is irreversible cloud state change. Confirm the deploy prompt explicitly.
+
+### "`pulumi preview` auto-passes but `pulumi refresh` is blocked"
+
+`pulumi preview` is read-only: it computes what would change without applying anything. `pulumi refresh` queries AWS/Azure/GCP and modifies the Pulumi state file to match actual cloud state — even if it makes no resource changes, it writes to the state backend. Confirm `refresh` prompts manually.
+
+### "Flyway / Liquibase migration is blocked even for dev database"
+
+Both `flyway migrate` and `liquibase update` are classified as ask because they modify the database schema — even on a local dev database. Schema changes can be difficult to revert without a rollback script. To auto-pass for a specific environment, add a CLAUDE.md override:
+```markdown
+# hands-free overrides
+- flyway migrate against localhost dev DB → auto-pass
+```
+
+### "`ssh-keyscan` is blocked but I just want to check fingerprints"
+
+`ssh-keyscan github.com` (writing to stdout only) → auto-pass. The blocked version is `ssh-keyscan github.com >> ~/.ssh/known_hosts` — this writes outside cwd, modifying your SSH trust store. Capture the output first (`ssh-keyscan github.com > ./known_host.tmp`) to inspect it, then manually add if correct.
+
+### "`go generate ./...` is asking for confirmation"
+
+`go:generate` directives can run arbitrary commands (shell scripts, code generators, API fetchers). Unlike `go build` or `go test`, there's no guarantee about what will be executed. Hands-free asks so you can review the generate directives first. Use `grep -r '//go:generate' ./` to inspect what will run, then confirm the prompt.
 
 ## HARD STOP — Always Pause
 

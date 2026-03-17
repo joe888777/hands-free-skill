@@ -176,6 +176,42 @@
 - `/hands-free recommend prune` added to commands list
 - `/hands-free log --full` noted in commands
 
+### Added (iteration 10 — batch 41)
+
+**IaC and cloud provisioning tools**
+- Pulumi: `preview/stack ls/stack output` → auto; `up/destroy/refresh/import` → ask
+- AWS CDK: `ls/diff/synth` → auto; `deploy/destroy/bootstrap` → ask
+- Ansible: `--check/--syntax-check` → auto; `ansible-playbook <playbook>` → ask (remote SSH); `ansible-lint` → auto; `ansible-vault encrypt` → ask; `ansible-vault view` → auto
+
+**Database migration tools**
+- Flyway: `info` → auto; `migrate/baseline/repair/clean` → ask
+- Liquibase: `status/history` → auto; `update/rollback/drop-all` → ask
+- Knex: `migrate:status/list` → auto; `migrate:latest/rollback/seed:run` → ask
+- Alembic: `current/history` → auto; `upgrade/downgrade` → ask
+
+**SSH key management**
+- `ssh-add -l/-L` → auto; `ssh-add` (add/delete) → ask (modifies agent state, outside cwd)
+- `ssh-keyscan <host>` (stdout) → auto; `>> ~/.ssh/known_hosts` → ask (writes outside cwd)
+- `ssh-copy-id` → ask (modifies remote `~/.ssh/authorized_keys`)
+- `ssh-keygen -f ./key` (cwd output) → auto; no `-f` (defaults to `~/.ssh/`) → ask
+
+**Go extended tools**
+- `go generate ./...` → ask (runs arbitrary `//go:generate` directives)
+- `go doc`, `go mod download`, `go mod verify`, `go mod graph`, `go env`, `go list ./...` → auto-pass
+- `go build -o ./bin/...` → auto-pass (cwd-scoped)
+- `go install <pkg>@<ver>` → ask (writes to `$GOPATH/bin` — outside cwd)
+
+**Container alternatives**
+- Podman and nerdctl: same rules as Docker equivalents (build/run/ps/inspect → auto; push/login/logout → ask)
+
+**Troubleshooting entries**
+- `ansible-playbook` blocked even on localhost (external SSH execution)
+- `cdk synth` vs `cdk deploy` distinction
+- `pulumi preview` vs `pulumi refresh` distinction
+- Flyway/Liquibase migration blocking for dev databases (CLAUDE.md override pattern)
+- `ssh-keyscan` blocking (stdout-only vs `>> known_hosts`)
+- `go generate` blocking (arbitrary command execution)
+
 ## [2.2.0] — 2026-03-17
 
 ### Added (iteration 5)
