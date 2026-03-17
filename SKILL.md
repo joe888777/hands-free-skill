@@ -584,9 +584,28 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `wget -O /usr/local/bin/tool URL` → ask (writes outside cwd); `wget -O ./tool URL` → auto-pass (downloads to cwd, same as `curl -o ./tool URL`)
 - `curl -s URL > ./data.json` → auto-pass (GET request, writes output to cwd file); `curl -s URL > /tmp/file` → ask (writes to system temp, escapes cwd)
 - Pipe-to-shell patterns: `| bash`, `| sh`, `| zsh` after a network fetch — always HARD STOP regardless of path
-- System inspection commands (read-only, always auto-pass regardless of mode): `ps aux`, `ps -ef`, `lsof -i`, `netstat -an`, `ss -tuln`, `df -h`, `du -sh ./`, `top -bn1`, `htop -t`, `uname -a`, `which <cmd>`, `whereis <cmd>`, `type <cmd>` — these display state, never modify it
+- System inspection commands (read-only, always auto-pass regardless of mode): `ps aux`, `ps -ef`, `lsof -i`, `lsof -i :8080`, `lsof -p <pid>`, `lsof +D ./`, `netstat -an`, `ss -tuln`, `df -h`, `du -sh ./`, `top -bn1`, `htop -t`, `btop`, `glances`, `uname -a`, `uname -m`, `which <cmd>`, `whereis <cmd>`, `type <cmd>`, `hostname`, `uptime`, `free -h`, `vmstat`, `iostat`, `sar` — these display state, never modify it
 - Network diagnostic commands (read-only, auto-pass): `ping <host>` (ICMP echo, read-only), `traceroute <host>` / `tracepath <host>`, `dig <domain>`, `nslookup <domain>`, `host <domain>`, `whois <domain>`, `curl --head <url>` (HEAD request, no body download), `curl -I <url>` (same as --head)
 - File format and encoding commands (cwd-scoped, auto-pass): `dos2unix ./file`, `unix2dos ./file`, `iconv -f UTF-8 -t UTF-16 ./input.txt`, `file ./binary` (detect file type), `hexdump -C ./file`, `xxd ./file`
+- **Clipboard and GUI commands:**
+  - `pbcopy` (macOS: reads stdin to clipboard) → auto-pass (session-scoped; no file writes)
+  - `pbpaste` (macOS: writes clipboard to stdout) → auto-pass (read-only; outputs clipboard content)
+  - `cat ./file.txt | pbcopy` → auto-pass (cwd-scoped; copies file to clipboard; read-only for the file)
+  - `xclip -selection clipboard` / `xclip -selection clipboard -o` → auto-pass (same as pbcopy/pbpaste; session-scoped)
+  - `xsel --clipboard --input` / `xsel --clipboard --output` → auto-pass (same; session-scoped)
+  - `wl-copy` / `wl-paste` (Wayland clipboard) → auto-pass (same session-scoped pattern)
+  - `open ./file.pdf` / `open ./index.html` (macOS) → auto-pass (opens file with default application; cwd-scoped)
+  - `open https://localhost:3000` → auto-pass (opens localhost URL in browser; local)
+  - `open https://example.com` → auto-pass (read-only; opens external URL in browser; no code executed)
+  - `xdg-open ./file.pdf` / `xdg-open ./index.html` (Linux) → auto-pass (same as `open` on macOS)
+  - `xdg-open https://localhost:3000` → auto-pass (same)
+- **macOS system preferences (`defaults`):**
+  - `defaults read` / `defaults read <domain>` / `defaults read <domain> <key>` → auto-pass (read-only system preferences inspection)
+  - `defaults read-type <domain> <key>` → auto-pass (read-only: shows the type of a preference key)
+  - `defaults write <domain> <key> <value>` → ask (modifies macOS system preferences — persistent system state change)
+  - `defaults delete <domain> <key>` → ask (removes a preference key — persistent system state change)
+  - `defaults domains` → auto-pass (read-only: lists all preference domains)
+  - `defaults find <word>` → auto-pass (read-only: searches preferences for a keyword)
 - **`conda`/`mamba` commands** (Python data science environments):
   - `conda create -n envname python=3.11` → ask (creates new global env — writes to `~/.conda/`)
   - `conda activate envname` → auto-pass (activates env for session)
