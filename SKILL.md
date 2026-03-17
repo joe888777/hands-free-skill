@@ -543,6 +543,35 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `ssh user@host`, `scp user@host:...`, `rsync` to/from remote host → ask (remote machine access — not within `./`)
 - `git submodule add <url>` → auto-pass in full (adds submodule to cwd, non-destructive); ask in partial (execution-type decision)
 - Cloud storage CLIs writing to remote buckets → ask (remote state, not within `./`): `aws s3 cp`/`sync`/`rm`, `gsutil cp`/`rsync`/`rm`, `az storage blob upload`; cloud read commands (`aws s3 ls`, `gsutil ls`) → auto-pass (read-only)
+- **Google Cloud CLI (`gcloud`):**
+  - `gcloud config list`, `gcloud auth list`, `gcloud projects list`, `gcloud info` → auto-pass (read-only)
+  - `gcloud compute instances list`, `gcloud run services list`, `gcloud functions list` → auto-pass (read-only)
+  - `gcloud compute instances start/stop/delete` → ask (modifies cloud infrastructure)
+  - `gcloud run deploy`, `gcloud functions deploy`, `gcloud app deploy` → ask (deploys to remote — shared/remote state)
+  - `gcloud builds submit` → ask (triggers remote Cloud Build)
+  - `gcloud storage ls`, `gcloud storage cat` → auto-pass (read-only cloud storage inspection)
+  - `gcloud storage cp ./file gs://bucket/` → ask (uploads to remote storage)
+- **Azure CLI (`az`):**
+  - `az account list`, `az account show`, `az group list`, `az resource list` → auto-pass (read-only)
+  - `az webapp list`, `az functionapp list`, `az vm list` → auto-pass (read-only)
+  - `az webapp up`, `az functionapp deploy`, `az container create` → ask (deploys to cloud)
+  - `az vm start/stop/deallocate` → ask (modifies VM state)
+  - `az storage blob list` → auto-pass (read-only); `az storage blob upload` → ask (writes to remote)
+- **Release management tools:**
+  - `semantic-release --dry-run`, `npx semantic-release --dry-run` → auto-pass (read-only preview)
+  - `semantic-release` / `npx semantic-release` (without `--dry-run`) → ask (publishes releases to npm/GitHub — external)
+  - `changeset version` (`npx changeset version`) → auto-pass (bumps version files locally)
+  - `changeset publish` → ask (publishes packages to npm — external registry)
+  - `npx standard-version --dry-run` → auto-pass (read-only)
+  - `npx standard-version` → ask (creates commits/tags and may publish)
+  - `release-it --dry-run` → auto-pass (read-only); `release-it` → ask (creates release, may push/publish)
+- **Code quality tools:**
+  - `semgrep ./` / `semgrep --config auto ./` → auto-pass (cwd-scoped static analysis)
+  - `codeql database create` → ask (writes to a specified path — check if cwd); `codeql analyze ./db` → auto-pass if analyzing cwd database
+  - `sonar-scanner` (with `sonar.host.url=localhost`) → auto-pass; remote SonarQube server → ask (sends code to external server)
+  - `eslint --fix ./src` → auto-pass (cwd-scoped auto-fix)
+  - `eslint --fix-dry-run ./src` → auto-pass (read-only fix preview)
+  - `asdf install`, `asdf plugin add` → ask (writes to `~/.asdf/` — outside cwd); `asdf list`, `asdf current` → auto-pass (read-only)
 - `gh` (GitHub CLI) read operations → auto-pass: `gh issue list`, `gh pr list`, `gh pr view`, `gh repo view`, `gh run list`, `gh run view`, `gh run watch`, `gh workflow list`, `gh workflow view`, `gh gist view`, `gh gist list`, `gh api <endpoint>` (GET only), `gh repo list`, `gh label list`, `gh tag list`, `gh search issues/prs/repos`
 - `gh` (GitHub CLI) write operations → ask (shared/remote state): `gh issue create`, `gh pr create`, `gh pr merge`, `gh pr close`, `gh issue close`, `gh pr review`, `gh release create`, `gh workflow run`, `gh workflow enable/disable`, `gh gist create`, `gh gist edit`, `gh repo fork`, `gh repo create`, `gh api <endpoint>` (POST/PUT/DELETE), `gh pr comment`, `gh issue comment`, `gh pr edit`, `gh issue edit`
 - `gh pr checkout <number>` → ask in partial (checks out remote PR branch, changes local branch state); auto-pass in full (equivalent to `git fetch` + `git checkout`)
