@@ -18,7 +18,9 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | Temporarily pause without changing mode | `/hands-free pause` / `/hands-free resume` |
 > | See what would be auto-accepted | `/hands-free dry-run` |
 > | Check current settings | `/hands-free status` |
+> | Show session decisions | `/hands-free log` |
 > | Understand a past auto-decision | `/hands-free explain` |
+> | Get optimization suggestions | `/hands-free recommend` |
 > | Clear learned history | `/hands-free reset` |
 > | Auto-commit at milestones | `/hands-free auto-commit on` |
 > | Pause before phase transitions | `/hands-free review-checkpoints on` |

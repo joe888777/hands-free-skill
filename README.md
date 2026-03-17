@@ -223,11 +223,13 @@ Hands-free records your choices in `preferences.md` whether it's on or off.
 | 3-4x | medium | Auto-applied with announcement |
 | 5x+ | high | Auto-applied silently |
 
-Over time, hands-free picks **what you would pick**, not just the default recommendation.
+**Staleness:** If you override a learned preference, confidence decreases. Override 3x → rule replaced with new preference at low confidence.
+
+Over time, hands-free picks **what you would pick**, not just the default recommendation. Use `/hands-free reset` to clear all preferences if they've drifted from your actual preferences.
 
 ## Session log
 
-Run `/hands-free log` anytime to see a summary of all auto-accepted decisions in the current session.
+Run `/hands-free log` anytime to see a summary of all decisions in the current session. The log is in-memory only — it resets at the end of each conversation. Events include brainstorming choices, design approvals, auto-commits, review checkpoints, and hard stops.
 
 ## Security
 
