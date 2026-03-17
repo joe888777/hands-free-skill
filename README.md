@@ -55,7 +55,8 @@ cp -r autopilot-skill ~/.claude/skills/hands-free
 /hands-free status                    # Show current mode + all settings
 /hands-free recommend                 # Suggest optimal settings
 /hands-free recommend promote <action> # Promote a standard hard-stop action to auto-accept
-/hands-free log                       # Show session decisions
+/hands-free recommend prune           # Review and remove stale low-confidence preferences
+/hands-free log                       # Show session decisions (use --full for complete log)
 /hands-free check <cmd>               # Preview how a command would be classified (no side effects)
 ```
 
@@ -289,59 +290,69 @@ CLAUDE.md instructions take precedence over global `preferences.md` rules.
 
 ## What's new in 2.3
 
-**New command:**
-- `/hands-free check <command>` — preview how any command would be classified (auto-pass / ask / HARD STOP) without running it; shows the rule that matched and a safe alternative for hard stops
+**New commands:**
+- `/hands-free check <command>` — preview how any command would be classified (auto-pass / ask / HARD STOP) without running it; handles compound commands, pipelines, and shell variables; shows rule and safe alternative
+- `/hands-free recommend prune` — review and remove stale low-confidence observations from `preferences.md`
+- `/hands-free log --full` — complete session log with full event history
 
 **Security:**
-- Shell script content scanning: writing a `.sh`, `.bash`, or `.zsh` file (via Edit/Write) that embeds `curl | bash`, language RCE, or `chmod 777` triggers a hard stop before the write — not after
-- Subshell `$(...)` rule: subshell substitutions inherit the classification of their inner command (`bash $(curl URL)` → HARD STOP)
-- Complex shell construct rule: `if/for/while/case` branches — classified by most restrictive branch
+- Shell script content scanning: writing a `.sh`, `.bash`, or `.zsh` file that embeds `curl | bash`, language RCE, or `chmod 777` triggers a hard stop before the write
+- Subshell `$(...)` rule: subshell substitutions inherit the inner command's classification (`bash $(curl URL)` → HARD STOP)
+- Pipe (`|`) classification: classify each stage; most restrictive wins; `| bash/sh/zsh` → HARD STOP
+- Process substitution `<(cmd)` rule: `diff <(git show HEAD:file) ./file` → auto-pass; `source <(curl URL)` → HARD STOP
+- Shell variable expansion in paths: unknown vars → ask (conservative); known escape-list vars → ask; clearly local vars → auto-pass
+- Sensitive env-var name detection: `API_KEY=live-secret cmd` announces risk (appears in `ps aux`)
+- Secrets expanded: Slack tokens (`xoxb-`, `xoxp-`), PGP key marker, `client_secret=`, `smtp_password=`, connection string passwords
+- Complex shell construct rule: `if/for/while/case` — classified by most restrictive branch
 - Heredoc pattern classification: local DB heredoc → auto-pass; remote DB or POST heredoc → ask
-- Secrets expanded: Slack tokens (`xoxb-`, `xoxp-`), PGP key marker, `client_secret=`, `totp_secret=`, `smtp_password=`, connection string passwords (`postgresql://user:pass@...`)
+- Preference conflict resolution: higher-confidence rule wins; conflict announced once
+
+**Tool coverage — Package management:**
+- `npm ci` → auto-pass (lockfile-exact install, deterministic)
+- `npm audit fix` → auto-pass; `npm audit fix --force` → ask
+- `bun add/remove/upgrade` → auto-pass (cwd-scoped)
+- `pnpm run`, `yarn run`, `bun run` script inference: known-safe targets auto-pass, deploy/prod targets ask, unknown targets → inspect `package.json` first
 
 **Tool coverage — Python:**
-- `uv`: sync, add, remove, venv, pip compile, tool run → all auto-pass (cwd-scoped)
+- `uv`: sync, add, remove, venv, pip compile, tool run → all auto-pass
 - `poetry`: install, add, run → auto-pass; `pipenv`: install, run → auto-pass
 - `black`, `isort`, `bandit`, `safety`, `coverage run/html`, `hatch build/run`, `python -m build` → auto-pass
-- `biome check/format`, `ts-node`, `tsx` → auto-pass (cwd-scoped)
+- `conda list`, `conda env list`, `conda activate` → auto-pass; `conda create/install` → ask (writes outside cwd)
 
 **Tool coverage — Rust:**
 - `cargo nextest`, `cargo expand`, `cargo fix`, `cargo clippy --fix`, `cross build`, `cargo miri test` → auto-pass
-- `cargo watch -x run/test`, `cargo outdated`, `cargo tree`, `cargo deny check`, `cargo machete` → auto-pass
-- `cargo install --path .` → ask (writes to `~/.cargo/bin`)
+- `cargo watch`, `cargo outdated`, `cargo tree`, `cargo deny check`, `cargo machete` → auto-pass
 
 **Tool coverage — TypeScript/Frontend:**
 - `tsup`, `vite build/dev`, `esbuild`, `rollup`, `npx prettier --write/--check` → auto-pass
-- `vitest watch`, `jest --watchAll` → auto-pass
+- `biome check/format`, `ts-node`, `tsx`, `vitest watch` → auto-pass
 
-**Tool coverage — Build systems:**
-- `cmake`, `ninja`, `meson` → auto-pass (cwd-scoped); `make clean/all/lint/fmt/check` → auto-pass; `make install/uninstall` → ask
+**Tool coverage — Debugging and analysis:**
+- `gdb`/`lldb`/`valgrind`/`perf` on local binaries → auto-pass; on running process PIDs → ask
+- Security testing tools (`nmap localhost`, `burpsuite` on local dev) → context-dependent
 
-**Tool coverage — Services:**
-- `uvicorn/gunicorn` on localhost → auto-pass; `--host 0.0.0.0` → ask
-- `flask run`, `python manage.py runserver` → auto-pass (localhost only)
-- `pm2 list` → auto-pass; `pm2 start/stop` → ask
-- `act`, `circleci local execute` → auto-pass (local CI runners)
+**Tool coverage — Infrastructure:**
+- GitHub CLI (`gh`): 15+ read ops auto-pass; write ops ask; `gh pr checkout` auto in full, ask in partial
+- Playwright MCP: 8 read tools auto-pass; 14 write/interaction tools ask; `browser_evaluate` always ask
+- kubectl: `get/describe/logs/port-forward` → auto-pass; `apply` (local file) auto in full; `delete/scale/rollout restart` → ask
+- AWS CLI: `ec2 describe-*`, `iam list-*`, `lambda list-*`, `logs get-*` → auto-pass; `lambda invoke`, `iam create-*`, `ec2 start/stop`, `cloudformation deploy` → ask
+- MCP tool naming heuristic: `get/fetch/list/search` → read (auto); `create/update/delete/send` → write (ask)
 
-**Tool coverage — Docker, Redis, SQL:**
-- Docker: `cp`, `logs`, `inspect`, `pull`, `run --rm` (well-known images), `buildx build` → auto-pass
-- Redis: read ops on localhost → auto-pass; write/destructive ops and remote hosts → ask
-- SQL DDL: `DROP TABLE` / `TRUNCATE` → ask even on local DB; `SELECT`/`INSERT`/`CREATE TABLE` → auto-pass
-
-**Git:**
-- `git pull`, `git pull --rebase` → auto-pass in full; ask in partial
-- `git pull --ff-only` → auto-pass (safe fast-forward)
-- `git rebase --continue/skip/abort`, `git cherry-pick --continue/abort`, `git merge --abort` → auto-pass (mid-operation continuations)
-- `git apply ./patch.diff`, `git am ./patches/` → auto-pass (local patch files)
-- `git stash drop`, `git stash clear` → ask (irreversible)
-- `git ls-files`, `git blame`, `git shortlog`, `git describe` → auto-pass (read-only)
+**Tool coverage — Build systems, services, Docker, Redis, SQL:**
+- `cmake`, `ninja`, `meson` → auto-pass; `make clean/all/lint/fmt/check` → auto-pass; `make install/uninstall` → ask
+- `uvicorn/gunicorn` localhost → auto-pass; `--host 0.0.0.0` → ask
+- Docker: `cp`, `logs`, `inspect`, `pull`, `run --rm` (well-known), `buildx build` → auto-pass
+- Redis: read ops localhost → auto-pass; write/destructive/remote → ask
+- SQL DDL: `DROP TABLE/TRUNCATE` → ask; `SELECT/INSERT/CREATE TABLE` → auto-pass
+- Network diagnostics: `ping`, `traceroute`, `dig`, `nslookup`, `curl --head` → auto-pass (read-only)
 
 **Behavior:**
-- CLAUDE.md conflict resolution: user `/hands-free` commands always win for the current session, except project security rules (which cannot be overridden)
-- `/hands-free status` now shows active CLAUDE.md overrides
-- Auto-commit edge cases: detached HEAD → skip with announcement; bare repo → skip silently
-- Package updates: `cargo update`, `npm update`, `pnpm update`, `yarn upgrade` → auto-pass
-- Security Philosophy section: explains WHY hard stops exist (RCE, escalation, secrets, external state)
+- Parallel agents (dispatching-parallel-agents): agent count auto-accepted in full; task assignment review auto-approved in full
+- Announcement throttling: precise rules for what counts as "identical" across iterations; every-10-iteration cadence summary
+- Auto-commit new edge cases: GPG signing failure, post-commit hook failure (non-blocking), submodule pointer changes
+- CLAUDE.md: user `/hands-free` commands win except project security rules; status shows active overrides
+- Known Limitations section: 8 documented limitations (session scope, concurrent sessions, alias inspection, etc.)
+- `/hands-free log --full`: complete event timeline with skill context, decision, and source
 
 ## What's new in 2.1
 
