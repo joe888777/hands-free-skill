@@ -412,7 +412,9 @@ Never override this check, even in crazy-workspace mode. Secrets detection is a 
 | Pre-commit hook fails | Announce failure, pause for user input; do NOT retry automatically |
 | Secrets detected in staged files | Block with announcement; remove offending files from staging, then allow user to re-trigger |
 | `git add` fails (permission error, locked index) | Announce error, pause for user input |
+| `git add` partially fails (some files staged, some not) | Announce partial failure, list which files failed; pause for user input before committing the partial staging |
 | Only untracked files, no modifications | Treat as "no changes" and skip |
+| Merge conflicts in working tree | Skip auto-commit; announce `[auto-commit] Skipping — merge conflicts present` |
 
 ### Session Log Entry
 
@@ -461,6 +463,8 @@ To change: /hands-free learning <h/m/l>
 - `/hands-free reset` clears everything at once
 
 There is no time-based pruning — observations that remain relevant stay indefinitely.
+
+**If `preferences.md` is corrupted or unreadable:** Continue the session without loaded preferences; announce once: `[hands-free] Could not read preferences.md — running with defaults. Use /hands-free reset to recreate the file.` Do not fail or pause the entire session.
 
 **Preference staleness:** Observations in `preferences.md` do not expire automatically. However, if the user makes a choice that contradicts an existing medium- or high-confidence preference, update the record:
 - User chose differently 1x → note the divergence as an observation, keep existing rule
