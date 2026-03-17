@@ -336,12 +336,15 @@ Record a preference whenever the user **manually chooses** an option — whether
 ### Recording Format
 
 ```markdown
-## Learned Rules
+## Learned Rules (high confidence — 5x+)
 - finishing-branch → "Push and create PR" (5x, high)
+
+## Learned Rules (medium confidence — 3-4x)
 - writing-plans → "subagent-driven" (3x, medium)
 
-## Observations
-- 2026-02-26: brainstorming → chose simplest over recommended (1x)
+## Observations (low confidence — tracking)
+- 2026-02-26: brainstorming → chose "simplest approach" over recommended (1x)
+- 2026-02-28: brainstorming → chose "simplest approach" again (2x)
 ```
 
 ## `/hands-free status`
