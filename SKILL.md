@@ -425,12 +425,15 @@ Preferences stored in `~/.claude/skills/hands-free/preferences.md`. Records choi
 
 ```markdown
 # hands-free overrides
+- Default mode: full            ← activates full mode at session start automatically
+- Auto-commit: on               ← enables auto-commit at session start
+- Learning: high                ← sets learning sensitivity at session start
 - Always pause before auto-committing in this repo (production codebase)
 - Never auto-accept git push, even with crazy-workspace enabled
 - Shell commands containing `psql postgresql://prod` must always ask
 ```
 
-Claude reads CLAUDE.md at the start of each session. These instructions take precedence over global preferences from `preferences.md`.
+Claude reads CLAUDE.md at the start of each session. **`Default mode` / `Auto-commit` / `Learning` directives** are applied automatically at session start without the user needing to type any `/hands-free` commands. All other `# hands-free overrides` lines are natural-language rules parsed for each decision: if a rule says "never auto-accept X", X becomes a hard stop for this project. CLAUDE.md instructions take precedence over `preferences.md`.
 
 **`/hands-free learning` with no argument:** Prints the current learning level and threshold summary:
 ```
@@ -594,8 +597,27 @@ Hands-Free Recommendations:
 - Promoting standard hard-stop actions to auto-accept if user always approves them (requires explicit user confirmation via `/hands-free recommend promote <action>`)
 - Demoting auto-accept actions to hard-stop if user frequently overrides (> 50% override rate)
 
+**`/hands-free recommend promote <action>`** — promote a specific standard hard-stop action to auto-accept. Requires double confirmation (typed "confirm" twice) to prevent accidental promotion. Cannot promote universal hard stops.
+
+Example flow:
+```
+/hands-free recommend promote git-push-feature-branch
+
+This will auto-approve `git push` when on a feature branch (not main/master).
+  Evidence: 8/8 pushes approved, 0 rejected
+  Scope: feature branches only (main/master push remains a hard stop)
+
+Type "confirm" to add this rule: _
+> confirm
+Type "confirm" once more to finalize: _
+> confirm
+
+Rule added: git push to feature branches → auto-approve
+Saved to preferences.md as high-confidence rule.
+```
+
 **What `/hands-free recommend` will NEVER suggest:**
-- Promoting `curl | bash`, `chmod 777`, secrets detection, `rm -rf *`, or `rm -rf .git` to auto-accept — these are universal hard stops that cannot be promoted under any circumstances, regardless of usage history
+- Promoting `curl | bash`, `chmod 777`, `source <(curl)`, language-level RCE, secrets detection, `rm -rf *`, or `rm -rf .git` to auto-accept — universal hard stops cannot be promoted under any circumstances, regardless of usage history
 
 ## Review Checkpoints
 
