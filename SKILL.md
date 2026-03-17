@@ -463,11 +463,14 @@ Filename patterns to block:
 - `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`
 - `*_rsa`, `*_dsa`, `*_ed25519`, `*id_rsa`, `*id_ed25519`
 - `*.secret`, `credentials.json`, `secrets.yaml`, `secrets.yml`, `*.keystore`
+- `.npmrc` — often contains `//registry.npmjs.org/:_authToken=` publish tokens
+- `*.cer`, `*.der`, `*.crt` — certificate files that may include private key material
 
 Content signals in staged diffs (case-insensitive):
 - Token prefixes: `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_`, `AKIA` (AWS key prefix)
 - Key markers: `-----BEGIN RSA`, `-----BEGIN OPENSSH`, `-----BEGIN EC`, `-----BEGIN PRIVATE`
-- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`
+- Assignment patterns: `password=`, `passwd=`, `secret=`, `token=`, `api_key=`, `api_secret=`, `private_key=`, `database_url=`, `signing_key=`
+- HTTP auth headers hardcoded in source: `Authorization: Bearer `, `X-Api-Key: ` (case-insensitive) in non-test, non-example files
 
 Never override this check, even in crazy-workspace mode. Secrets detection is a hard stop in all modes.
 
