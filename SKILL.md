@@ -628,6 +628,19 @@ Each iteration flows automatically:
 6. Exits iteration → ralph-loop feeds prompt again
 7. Repeats until `<promise>DONE</promise>`
 
+### Ralph Loop State File Edge Cases
+
+When reading `.claude/.ralph-loop.local.md`, handle these failure modes:
+
+| Situation | Behavior |
+|---|---|
+| File not found | Not in a loop — disable loop-aware mode silently |
+| `max_iterations` missing or `null` | Disable iteration warnings; treat as unlimited |
+| `max_iterations: -1` | Treat as unlimited; no warnings |
+| `iteration` field missing | Assume iteration 1; continue normally |
+| File is malformed YAML/unreadable | Log `[hands-free] Could not read loop state file — running without loop-awareness` and continue |
+| `active: false` | Loop has ended — disable loop-aware mode |
+
 ### Iteration Warnings
 
 When loop-aware, monitor iteration count against `max_iterations` from `.claude/.ralph-loop.local.md`. Issue warnings at these thresholds:

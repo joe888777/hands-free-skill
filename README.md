@@ -99,11 +99,14 @@ Hands-Free Status
   Learning:             high
   Auto-commit:          on
   Review checkpoints:   off
+  Paused:               no
   Loop-aware:           no
 
   Session decisions:    7 auto-accepted, 1 paused
   Preferences loaded:   2 rules (1 high, 1 medium)
-  Active hard stops:    curl|bash, chmod 777, secrets, rm -rf *, rm -rf .git, git push
+
+  Universal hard stops: curl|bash, chmod 777, secrets-in-commit, rm -rf *, rm -rf .git
+  Mode hard stops:      git push, git merge, git reset --hard (paused in this mode)
 ```
 
 ### Previewing before enabling
@@ -225,6 +228,20 @@ Over time, hands-free picks **what you would pick**, not just the default recomm
 ## Session log
 
 Run `/hands-free log` anytime to see a summary of all auto-accepted decisions in the current session.
+
+## Security
+
+Hands-free enforces **5 universal hard stops** in ALL modes, including `crazy-workspace`. These cannot be overridden, promoted to auto-accept, or disabled:
+
+| Pattern | Why |
+|---|---|
+| `curl \| bash`, `wget \| sh`, `eval $(curl ...)` | Remote code execution — arbitrary code from the internet |
+| `chmod 777`, `chmod a+rwx` | World-writable permissions — any user can modify the file |
+| Secrets in staged files | Prevent accidentally committing API keys, private keys, tokens |
+| `rm -rf *` | Indiscriminate wipe — deletes everything in scope |
+| `rm -rf .git` | Destroys version history — unrecoverable without a backup |
+
+All other hard stops (git push, merge, destructive ops) apply in `full`/`partial`/`off` modes but are auto-approved in `crazy-workspace` within `./`.
 
 ## Requirements
 
