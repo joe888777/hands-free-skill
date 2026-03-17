@@ -2108,6 +2108,42 @@ Options:
 - Review the git log for where progress stopped: `git log --oneline -20`
 - If systematic-debugging kept running, narrow the scope or fix the underlying test failure
 
+### "A command with `$VAR` is being blocked unexpectedly"
+
+Commands using shell variables in path arguments are classified conservatively when the variable's value is unknown. For example, `rm -rf $BUILD_DIR` triggers an ask because `$BUILD_DIR` could point anywhere. If you know the variable always resolves to a cwd-relative path, add a CLAUDE.md override:
+```markdown
+# hands-free overrides
+- $BUILD_DIR is always ./build — auto-pass cleanup commands using it
+```
+Or restructure the command: `rm -rf ./build` (explicit relative path) will auto-pass.
+
+### "A pipeline command is being blocked unexpectedly"
+
+A pipe `cmd1 | cmd2` is classified by the most restrictive component. If `cmd1` fetches from the internet (e.g., `curl URL | jq '.'`), it asks because `curl URL` escapes cwd — even though `jq` is safe. To make it auto-pass: redirect to a local file first (`curl URL > ./response.json && jq '.' ./response.json`), which keeps both steps cwd-scoped.
+
+Use `/hands-free check curl URL | jq '.'` to see the breakdown before running.
+
+### "An MCP tool I know is safe is being blocked"
+
+MCP tools are classified by their name's verb prefix. If a tool name is ambiguous (e.g., `notion-move-pages` — "move" is not in the read or write list), it defaults to ask. You can override this via CLAUDE.md:
+```markdown
+# hands-free overrides
+- notion-move-pages is safe to auto-approve in full mode
+```
+Or use `/hands-free check notion-move-pages` to see why it's classified as write.
+
+### "`npm run myscript` is asking for confirmation"
+
+Scripts with names not in the known-safe list (`test`, `build`, `lint`, `format`, `check`, `typecheck`, `dev`, etc.) trigger an ask. Hands-free will inspect `package.json` to read the script definition — if it's a simple safe command, it may auto-pass. If your script has a deployment-adjacent name but is actually safe, add a CLAUDE.md override:
+```markdown
+# hands-free overrides
+- npm run myscript is equivalent to npm run build — auto-pass
+```
+
+### "`conda create` / `conda install` is being blocked"
+
+`conda create` and `conda install` write to `~/.conda/` (outside cwd), so they always ask — even in crazy-workspace, which only overrides within `./`. This is intentional: conda environments are shared across projects and system-wide installs can affect other workflows. To proceed: confirm the prompt. For project-isolated Python environments, consider `uv venv .venv` or `python -m venv .venv` instead (both cwd-scoped and auto-pass).
+
 ## HARD STOP — Always Pause
 
 ### Security Philosophy

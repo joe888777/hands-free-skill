@@ -125,6 +125,57 @@
 - Shell variable examples (`rm -rf $BUILD_DIR` ask, `OUT=./dist && mkdir` auto-pass, `cp ./src $GOPATH/...` ask)
 - Trivially safe transparent commands (`echo && cargo build`, `printf && git add`)
 
+### Added (iteration 9 — batch 24–28)
+
+**MCP tool classification**
+- MCP tool naming heuristics: verb-prefix classification (get/fetch/list → read → auto; create/update/delete → write → ask; ambiguous → ask)
+- Navigation/state-change browser tools classified as write even without write verb
+- Playwright MCP tool-by-tool classification: `browser_snapshot/screenshot/console_messages` → auto; `browser_click/fill_form/type/evaluate` → ask; `browser_hover` → auto in full; `browser_install` → ask (system paths)
+- crazy-workspace override clarified: local-resource MCP tools may auto in crazy-workspace; external services (Notion, Slack, GitHub) always ask
+
+**GitHub CLI extended**
+- 15+ `gh` read operations added to auto-pass list: `gh run watch`, `gh workflow list/view`, `gh gist view/list`, `gh api GET`
+- `gh workflow run`, `gh repo fork`, `gh gist create/edit`, `gh api POST/PUT/DELETE`, `gh run rerun` → ask
+- `gh pr checkout` → auto in full; ask in partial
+
+**Shell rules**
+- Sensitive env-var name detection: `API_KEY=live-secret cmd` triggers security announcement
+- npm/pnpm/yarn/bun `run` script inference: named-safe targets auto, named-deploy targets ask, unknown → inspect package.json
+- `npm ci` → auto-pass (lockfile-exact install)
+- `npm audit fix` → auto-pass; `--force` → ask
+- `bun add/remove/upgrade` → auto-pass (cwd-scoped)
+- `conda list/env list/activate` → auto-pass; `conda create/install` → ask (writes to `~/.conda/`)
+- Network diagnostics: `ping`, `traceroute`, `dig`, `nslookup`, `curl --head` → auto-pass (read-only)
+- File format tools: `dos2unix`, `iconv`, `file`, `hexdump`, `xxd` → auto-pass (cwd-scoped)
+- kubectl expanded: `get/describe/logs/port-forward` → auto; `config use-context`, `rollout restart`, `scale`, `patch` → ask
+- AWS CLI extended: `ec2 describe-*`, `iam list-*`, `lambda list-*`, `logs get-*` → auto; `lambda invoke`, `ec2 start/stop`, `cloudformation deploy` → ask
+
+**Behavioral improvements**
+- Dispatching-parallel-agents: agent count auto in full; task assignment review auto in full; per-agent auto-commit tagged `[parallel-agent #N]`
+- Announcement throttling: precise definition of "identical" (same skill + same option + same source); every-10-iteration cadence summary
+- Preference conflict resolution: higher-confidence wins; conflict announced once; format evolution handled gracefully
+- `/hands-free log --full`: complete event timeline with skill context, source (recommended/preference/mode-default/user-override)
+- `/hands-free check` edge cases: compound command breakdown, pipeline breakdown, shell variable explanation
+- `/hands-free recommend prune`: review and remove stale low-confidence observations
+
+**Auto-commit edge cases**
+- `git commit` non-hook failure (user.email not configured) → announce and pause
+- Post-commit hook failure → non-blocking; commit succeeded; announce warning
+- GPG signing required → skip with announcement; never bypass `--no-gpg-sign`
+- Submodule pointer changes → skip unless explicitly staged
+
+**Troubleshooting**
+- `$VAR` blocking explanation and CLAUDE.md workaround
+- Pipeline blocking explanation (most restrictive component)
+- MCP tool blocking: verb-prefix heuristic and CLAUDE.md override
+- `npm run myscript` blocking: known-safe list and CLAUDE.md override
+- `conda create/install` blocking: writes to ~/.conda; suggest uv/venv for project-isolated envs
+
+**README**
+- "What's new in 2.3" expanded with all batch 22-28 additions
+- `/hands-free recommend prune` added to commands list
+- `/hands-free log --full` noted in commands
+
 ## [2.2.0] — 2026-03-17
 
 ### Added (iteration 5)
