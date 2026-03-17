@@ -1,5 +1,98 @@
 # Changelog
 
+## [2.3.0] — 2026-03-17
+
+### Added (iteration 6–7)
+
+**New command**
+- `/hands-free check <command>` — preview command classification (auto-pass / ask / HARD STOP) without running it; shows matched rule and safe alternative for hard stops
+- Quick Reference table updated with `/hands-free check`
+
+**Security**
+- Shell script content scan: Edit/Write tool scans script content for hard stop patterns before writing; applies in all modes including crazy-workspace
+- Subshell `$(...)` rule: `bash $(curl URL)` → HARD STOP; inner command's classification propagates to outer
+- Complex shell constructs (`if/for/while/case`): classified by most restrictive branch
+- Heredoc pattern rule: local DB heredoc → auto-pass; remote DB or POST heredoc → ask
+- Secrets expanded: Slack tokens (`xoxb-`, `xoxp-`), PGP key marker, `client_secret=`, `totp_secret=`, `smtp_password=`, `ftp_password=`, `sftp_password=`, `access_key=`, `auth_token=`, `X-Auth-Token:` header, connection string passwords
+- Security Philosophy section explaining WHY hard stops exist
+
+**Tool coverage — Python**
+- `uv sync`, `uv add`, `uv remove`, `uv venv`, `uv pip compile`, `uv tool run` → auto-pass
+- `poetry install/add/run`, `pipenv install/run` → auto-pass
+- `black`, `isort`, `bandit`, `safety`, `coverage run/html`, `pytest --cov` → auto-pass
+- `hatch build/run`, `python -m build`, `flit build` → auto-pass
+
+**Tool coverage — TypeScript/Frontend**
+- `tsup`, `vite build/dev`, `esbuild`, `rollup` → auto-pass (bundlers)
+- `biome check/format`, `ts-node`, `tsx`, `npx prettier --write/--check` → auto-pass
+- `vitest watch`, `jest --watchAll` → auto-pass
+
+**Tool coverage — Rust**
+- `cargo nextest run`, `cargo expand`, `cargo fix`, `cargo clippy --fix`, `cross build`, `cargo miri test` → auto-pass
+- `cargo watch -x run/test`, `cargo outdated`, `cargo tree`, `cargo deny check`, `cargo machete` → auto-pass
+- `cargo install --path .` → ask (writes to `~/.cargo/bin`)
+
+**Tool coverage — Build systems**
+- `cmake -B build -S .`, `cmake --build build`, `ninja -C build`, `meson setup/compile` → auto-pass
+- `make clean/all/lint/fmt/check` → auto-pass; `make install/uninstall` → ask
+
+**Tool coverage — Services**
+- `uvicorn/gunicorn` localhost → auto-pass; `--host 0.0.0.0` → ask
+- `flask run`, `python manage.py runserver` → auto-pass
+- `pm2 list` → auto-pass; `pm2 start/stop/restart` → ask
+- `act`, `circleci local execute` → auto-pass (local CI runners)
+
+**Tool coverage — Docker**
+- `docker cp`, `docker logs`, `docker inspect`, `docker pull` → auto-pass
+- `docker run --rm` with well-known image → auto-pass; unfamiliar image → ask
+- `docker buildx build` → auto-pass
+
+**Tool coverage — Redis**
+- `redis-cli` read ops on localhost → auto-pass; write/destructive ops and remote hosts → ask
+
+**Tool coverage — SQL DDL**
+- `psql -c "DROP TABLE"` / `TRUNCATE` → ask even on local DB
+- `psql -c "SELECT"` / `INSERT` / `CREATE TABLE` (local) → auto-pass
+- `sqlite3 ./db "INSERT"` → auto-pass; `sqlite3 ./db "DROP TABLE"` → ask
+
+**Git**
+- `git pull`, `git pull --rebase` → auto-pass in full; ask in partial
+- `git pull --ff-only` → auto-pass (safe fast-forward)
+- `git rebase --continue/skip/abort`, `git cherry-pick --continue/abort`, `git merge --abort` → auto-pass
+- `git apply ./patch.diff`, `git am ./patches/` → auto-pass (local patches)
+- `git stash drop`, `git stash clear` → ask (irreversible)
+- `git ls-files`, `git blame`, `git shortlog`, `git describe` → auto-pass
+
+**Shell rules**
+- System inspection commands: `ps aux`, `lsof`, `netstat`, `ss`, `df`, `du` → auto-pass (read-only)
+- `jq`, `awk`, `sed`, `xargs`, `sort`, `uniq`, `head`, `tail`, `wc`, `tee` (cwd-scoped) → auto-pass
+- `wget -O ./file URL` → auto-pass (downloads to cwd); `wget -O /outside URL` → ask
+- `curl -s URL > ./file.json` → auto-pass (GET to cwd); `> /tmp/file` → ask
+- `$CARGO_HOME`, `$GOPATH`, `$RUSTUP_HOME`, `$GOROOT` added to shell variable escape list
+- Package updates: `cargo update`, `npm update`, `pnpm update`, `yarn upgrade` → auto-pass
+- `pip install --upgrade <pkg>` (venv active) → auto-pass; (no venv) → ask
+- `npm run <script>`: known-safe targets auto-pass; unknown/deploy targets ask
+- `npx <well-known>` → auto-pass; `npx <unknown>@latest` → ask
+- `git stash drop` / `git stash clear` → ask
+- `cargo generate --git <url>` → ask; `cargo generate <local>` → auto-pass
+- `./script.sh` / `bash ./script.sh` (cwd-scoped, known-safe content) → auto-pass
+
+**Auto-commit edge cases**
+- Detached HEAD → skip with announcement
+- Bare repository → skip silently
+- Staged files from previous task (not modified by Claude) → exclude from auto-commit
+
+**CLAUDE.md behavior**
+- User `/hands-free` commands override CLAUDE.md directives for the current session
+- Project security rules in CLAUDE.md cannot be overridden by user commands
+- `/hands-free status` shows active CLAUDE.md overrides
+
+**Troubleshooting**
+- "Auto-commit skipped in detached HEAD": create a branch first
+- "Migration revert blocked": expected behavior; add CLAUDE.md override for dev databases
+- "Redis commands blocked unexpectedly": add CLAUDE.md override for non-standard local hostnames
+- `cargo install --path .` ask: expected; writes to `~/.cargo/bin`, not cwd
+
 ## [2.2.0] — 2026-03-17
 
 ### Added (iteration 5)

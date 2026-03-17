@@ -1,7 +1,7 @@
 ---
 name: hands-free
-version: 2.2.0
-description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (including deno run URL, perl), privilege escalation, global installs, secrets detection, and remote ops (ssh, scp, terraform) in all modes.
+version: 2.3.0
+description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (including deno run URL, perl), privilege escalation, global installs, secrets detection, remote ops (ssh, scp, terraform), and shell script content scanning. Comprehensive tool classification for uv/poetry/pipenv, Rust (nextest/cross/miri/cargo watch), TypeScript (tsup/vite/esbuild/biome), Docker, Redis, SQL DDL, server startup, and local CI runners. New /hands-free check command previews command classification.
 ---
 
 # Hands-Free

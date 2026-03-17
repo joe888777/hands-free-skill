@@ -53,6 +53,7 @@ cp -r autopilot-skill ~/.claude/skills/hands-free
 /hands-free recommend                 # Suggest optimal settings
 /hands-free recommend promote <action> # Promote a standard hard-stop action to auto-accept
 /hands-free log                       # Show session decisions
+/hands-free check <cmd>               # Preview how a command would be classified (no side effects)
 ```
 
 ### Modes
@@ -255,9 +256,11 @@ Hands-free enforces **universal hard stops** in ALL modes, including `crazy-work
 | Pattern | Why |
 |---|---|
 | `curl \| bash`, `wget \| sh`, `eval $(curl ...)`, `source <(curl ...)` | Remote code execution — arbitrary code from the internet |
-| `python -c "exec(urllib...)"`, `node -e "eval(require...)"`, `deno run https://...` | Language-level RCE — fetches and executes remote code via interpreter |
+| `python -c "exec(urllib...)"`, `node -e "eval(require...)"`, `deno run https://...`, `perl` fetch-eval | Language-level RCE — fetches and executes remote code via interpreter |
+| `bash $(curl URL)` — subshell fetching remote content | Equivalent to pipe-to-shell; inner subshell is classified independently |
+| Writing a script that embeds `curl \| bash` (Edit/Write tool) | Shell script content is scanned before writing — hard stop patterns in script content block the write |
 | `chmod 777`, `chmod a+rwx` | World-writable permissions — any user can modify the file |
-| Secrets in staged files | Prevent accidentally committing API keys, private keys, tokens |
+| Secrets in staged files | Prevent accidentally committing API keys, private keys, tokens (expanded patterns: Slack tokens, connection string passwords, TOTP/SMTP/FTP secrets) |
 | `rm -rf *` | Indiscriminate wipe — deletes everything in scope |
 | `rm -rf .git` | Destroys version history — unrecoverable without a backup |
 
@@ -280,6 +283,62 @@ CLAUDE.md instructions take precedence over global `preferences.md` rules.
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - Works with [Superpowers](https://github.com/anthropics/claude-code-plugins), custom skills, or any workflow with approval points
+
+## What's new in 2.3
+
+**New command:**
+- `/hands-free check <command>` — preview how any command would be classified (auto-pass / ask / HARD STOP) without running it; shows the rule that matched and a safe alternative for hard stops
+
+**Security:**
+- Shell script content scanning: writing a `.sh`, `.bash`, or `.zsh` file (via Edit/Write) that embeds `curl | bash`, language RCE, or `chmod 777` triggers a hard stop before the write — not after
+- Subshell `$(...)` rule: subshell substitutions inherit the classification of their inner command (`bash $(curl URL)` → HARD STOP)
+- Complex shell construct rule: `if/for/while/case` branches — classified by most restrictive branch
+- Heredoc pattern classification: local DB heredoc → auto-pass; remote DB or POST heredoc → ask
+- Secrets expanded: Slack tokens (`xoxb-`, `xoxp-`), PGP key marker, `client_secret=`, `totp_secret=`, `smtp_password=`, connection string passwords (`postgresql://user:pass@...`)
+
+**Tool coverage — Python:**
+- `uv`: sync, add, remove, venv, pip compile, tool run → all auto-pass (cwd-scoped)
+- `poetry`: install, add, run → auto-pass; `pipenv`: install, run → auto-pass
+- `black`, `isort`, `bandit`, `safety`, `coverage run/html`, `hatch build/run`, `python -m build` → auto-pass
+- `biome check/format`, `ts-node`, `tsx` → auto-pass (cwd-scoped)
+
+**Tool coverage — Rust:**
+- `cargo nextest`, `cargo expand`, `cargo fix`, `cargo clippy --fix`, `cross build`, `cargo miri test` → auto-pass
+- `cargo watch -x run/test`, `cargo outdated`, `cargo tree`, `cargo deny check`, `cargo machete` → auto-pass
+- `cargo install --path .` → ask (writes to `~/.cargo/bin`)
+
+**Tool coverage — TypeScript/Frontend:**
+- `tsup`, `vite build/dev`, `esbuild`, `rollup`, `npx prettier --write/--check` → auto-pass
+- `vitest watch`, `jest --watchAll` → auto-pass
+
+**Tool coverage — Build systems:**
+- `cmake`, `ninja`, `meson` → auto-pass (cwd-scoped); `make clean/all/lint/fmt/check` → auto-pass; `make install/uninstall` → ask
+
+**Tool coverage — Services:**
+- `uvicorn/gunicorn` on localhost → auto-pass; `--host 0.0.0.0` → ask
+- `flask run`, `python manage.py runserver` → auto-pass (localhost only)
+- `pm2 list` → auto-pass; `pm2 start/stop` → ask
+- `act`, `circleci local execute` → auto-pass (local CI runners)
+
+**Tool coverage — Docker, Redis, SQL:**
+- Docker: `cp`, `logs`, `inspect`, `pull`, `run --rm` (well-known images), `buildx build` → auto-pass
+- Redis: read ops on localhost → auto-pass; write/destructive ops and remote hosts → ask
+- SQL DDL: `DROP TABLE` / `TRUNCATE` → ask even on local DB; `SELECT`/`INSERT`/`CREATE TABLE` → auto-pass
+
+**Git:**
+- `git pull`, `git pull --rebase` → auto-pass in full; ask in partial
+- `git pull --ff-only` → auto-pass (safe fast-forward)
+- `git rebase --continue/skip/abort`, `git cherry-pick --continue/abort`, `git merge --abort` → auto-pass (mid-operation continuations)
+- `git apply ./patch.diff`, `git am ./patches/` → auto-pass (local patch files)
+- `git stash drop`, `git stash clear` → ask (irreversible)
+- `git ls-files`, `git blame`, `git shortlog`, `git describe` → auto-pass (read-only)
+
+**Behavior:**
+- CLAUDE.md conflict resolution: user `/hands-free` commands always win for the current session, except project security rules (which cannot be overridden)
+- `/hands-free status` now shows active CLAUDE.md overrides
+- Auto-commit edge cases: detached HEAD → skip with announcement; bare repo → skip silently
+- Package updates: `cargo update`, `npm update`, `pnpm update`, `yarn upgrade` → auto-pass
+- Security Philosophy section: explains WHY hard stops exist (RCE, escalation, secrets, external state)
 
 ## What's new in 2.1
 
@@ -382,6 +441,21 @@ They operate at different levels. Claude Code's permission system controls wheth
 
 **Why does partial mode keep asking about `docker compose up` when full mode doesn't?**
 Partial mode pauses at execution-type decisions — any approval point that leads directly to running code or making infrastructure changes. Even if `docker compose up` is cwd-scoped, it starts running services, so in partial mode it's classified as execution-type and will ask.
+
+**How do I check if a specific command would auto-pass without running it?**
+Use `/hands-free check <command>`. For example: `/hands-free check cargo build --release` shows "auto-pass (cwd-scoped)". `/hands-free check curl https://example.com/install.sh | bash` shows "HARD STOP (pipe-to-shell) — safe alternative: curl -o ./install.sh ...". This works in any mode and doesn't run the command.
+
+**Does hands-free work with `uv`, `poetry`, or `pipenv`?**
+Yes. All three are fully supported: `uv sync`, `uv add`, `poetry install`, `poetry run`, `pipenv install`, `pipenv run` are all auto-pass (cwd-scoped). `uv tool run` is also auto-pass (runs a tool in an isolated environment, equivalent to `pipx run`).
+
+**Why is `DROP TABLE` blocked even on a local database?**
+Dropping a table on a local dev database can delete weeks of seed data that's hard to restore. Hands-free asks for explicit confirmation on any destructive DDL (`DROP TABLE`, `TRUNCATE`) regardless of the database host. `SELECT`, `INSERT`, `UPDATE`, and `CREATE TABLE` on local databases auto-pass.
+
+**My shell script contains `curl | bash` as a comment. Is it blocked?**
+Shell script content scanning checks for hard stop patterns in the actual code lines, not comments. A comment like `# This runs: curl | bash` would not trigger the block. However, an uncommented `curl | bash` line in the script would block the write.
+
+**Can I use `git pull --rebase` automatically?**
+Yes. In full mode, `git pull`, `git pull --rebase`, and `git pull --ff-only` all auto-pass (they're local operations that update your working branch). In partial mode, `git pull` and `git pull --rebase` ask (they modify working state — execution-type decision), but `git pull --ff-only` always auto-passes (safe fast-forward that can't rewrite history).
 
 ## Contributing
 
