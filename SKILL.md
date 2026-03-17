@@ -553,7 +553,7 @@ Never override this check, even in crazy-workspace mode. Secrets detection is a 
 | Not in a git repo | Skip auto-commit; announce once: `[auto-commit] Skipping — not in a git repository` |
 | Pre-commit hook fails | Announce failure, pause for user input; do NOT retry automatically |
 | Secrets detected in staged files | Block with announcement; remove offending files from staging, then allow user to re-trigger |
-| `git add` fails (permission error, locked index) | Announce error, pause for user input |
+| `git add` fails (permission error, locked index) | Announce error with note: "If `.git/index.lock` exists, another git process may be running — wait and retry"; pause for user input |
 | `git add` partially fails (some files staged, some not) | Announce partial failure, list which files failed; pause for user input before committing the partial staging |
 | Only untracked files, no modifications | Treat as "no changes" and skip |
 | Merge conflicts in working tree | Skip auto-commit; announce `[auto-commit] Skipping — merge conflicts present` |
@@ -568,6 +568,8 @@ Never override this check, even in crazy-workspace mode. Secrets detection is a 
 ## Learning
 
 Preferences stored in `~/.claude/skills/hands-free/preferences.md`. Records choices whether hands-free is on or off.
+
+**Privacy note:** `preferences.md` stores skill names and option choices only. It never records code, file contents, or secrets. If hands-free is installed via git clone into a tracked directory, add `preferences.md` to `.gitignore` in the skill repo to avoid accidentally pushing personal preferences.
 
 **Scoping:** Preferences are global across all projects by default. They capture patterns like "I always choose subagent-driven" which generalize across codebases.
 
@@ -1319,3 +1321,8 @@ digraph {
 | "It's just a token in a comment" | Secrets detection fires — **UNIVERSAL HARD STOP, all modes** |
 | "This symlink stays in the repo" | Symlink may escape workspace — verify before auto-pass |
 | "crazy-workspace allows everything" | 5 universal hard stops remain — pipe-to-shell, chmod 777, secrets, rm -rf *, rm -rf .git |
+| "crazy-workspace so npm publish is fine" | Registry/deploy ops always ask — they're external, not within `./` |
+| "auto-commit is safe for a quick .env change" | Secrets detection fires — `.env` is blocked even in crazy-workspace |
+| "git add -A is faster" | Auto-commit NEVER uses `git add -A` — only specific files by name |
+| "deno run script.ts is local, it's fine" | `deno run ./script.ts` is fine; `deno run https://...` is HARD STOP |
+| "This curl POST is read-only" | POST/PUT/DELETE mutates remote state — ask first |
