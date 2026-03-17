@@ -334,7 +334,24 @@ Additional git command behavior (governed by normal mode rules, not always-pass)
 - `git filter-branch`, `git filter-repo` → ask in all modes (mass commit history rewrite — irreversible without backup)
 - `git bisect start`, `git bisect good`, `git bisect bad`, `git bisect reset` → auto-pass in full (debugging tool; bisect run is non-destructive read-only; bisect reset returns to HEAD)
 - `cd` within the workspace — changing into any subdirectory of the current workspace
+- `cargo nextest run` / `cargo nextest run --workspace` — next-generation Rust test runner (cwd-scoped, replaces `cargo test`)
+- `cargo expand` / `cargo expand --package <name>` — expand macros for inspection (cwd-scoped, read-only output)
+- `cargo fix` / `cargo fix --allow-dirty` — auto-apply linter suggestions (cwd-scoped, only modifies cwd files)
+- `cargo clippy --fix` — auto-fix Clippy suggestions (cwd-scoped, modifies source files)
+- `cross build --target <triple>` — cross-compilation in Docker container (uses local Docker; cwd-scoped)
+- `miri run` / `cargo miri test` — Rust MIR interpreter for UB detection (cwd-scoped, read-only analysis)
 - `pnpm install` / `yarn install` — package manager installs (cwd-scoped; equivalent to `npm install`)
+- `uv sync` / `uv pip install -r requirements.txt` — uv package manager installs (cwd-scoped; fastest Python package manager)
+- `uv add <package>` / `uv remove <package>` — uv dependency management (cwd-scoped; modifies pyproject.toml and lockfile)
+- `uv run <script>` — runs a script in the managed environment (cwd-scoped; does not execute remote code)
+- `uv venv` / `uv venv .venv` — creates a virtual environment in cwd (equivalent to `python -m venv .venv`)
+- `uv pip compile requirements.in` — resolves dependencies to a lockfile (cwd-scoped, read-write local files only)
+- `uv tool run <tool>` — runs a tool in an isolated environment (cwd-scoped; equivalent to `pipx run`)
+- `poetry install` / `poetry update` — Poetry package manager installs (cwd-scoped)
+- `poetry add <package>` / `poetry remove <package>` — Poetry dependency management (cwd-scoped)
+- `poetry run <cmd>` — runs a command in Poetry's virtual environment (cwd-scoped)
+- `pipenv install` / `pipenv sync` — Pipenv package manager installs (cwd-scoped)
+- `pipenv run <cmd>` — runs a command in Pipenv's virtual environment (cwd-scoped)
 
 ### Auto-pass when scoped to current directory
 
@@ -345,6 +362,7 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - Symlinked paths that resolve outside the workspace (e.g., `ln -s /etc target` followed by operations on `target`)
 - Shell variable expansions that point outside cwd: `$HOME`, `~`, `$XDG_*`, `$TMPDIR` used as write targets
 - Pipe-to-shell patterns: `| bash`, `| sh`, `| zsh` after a network fetch — always HARD STOP regardless of path
+- System inspection commands (read-only, always auto-pass regardless of mode): `ps aux`, `ps -ef`, `lsof -i`, `netstat -an`, `ss -tuln`, `df -h`, `du -sh ./`, `top -bn1`, `htop -t`, `uname -a`, `which <cmd>`, `whereis <cmd>`, `type <cmd>` — these display state, never modify it
 - Remote database connection strings in the command line: a URI of the form `postgresql://non-localhost`, `mysql://non-localhost`, `mongodb://non-localhost`, etc. where the host is not `localhost`, `127.0.0.1`, or a Unix socket path → ask (potentially targets a remote/shared database)
 - Global package installs that write outside cwd: `npm install -g`, `pip install` without active virtualenv (writes to system/user Python), `cargo install` (writes to `~/.cargo/bin`), `pip install --user` → ask
 - `pip install git+https://...` or `pip install <url>` → ask (installs from a URL or git repo, potentially untrusted code)
@@ -365,6 +383,11 @@ A shell command is **scoped to the current directory** if it contains no paths t
 - `nc`/`netcat` connecting to a remote host → ask; `nc -l` listening locally → auto-pass (local, user can disconnect)
 - `find . -exec rm` / `find . -exec rm -rf {} \;` → ask (bulk file deletion, potentially recursive)
 - `find . -exec <read-only-cmd>` (e.g., `find . -name "*.rs" -exec wc -l {} \;`) → auto-pass (cwd-scoped read)
+- `jq` piped from a local file or command output (`cat data.json | jq '.key'`, `jq -r '.[] | .name' ./data.json`) → auto-pass (cwd-scoped, read-only transformation)
+- `awk` on local files (`awk '{print $1}' ./log.txt`, `awk -F, '{sum+=$2} END{print sum}' ./data.csv`) → auto-pass (cwd-scoped); `awk -i inplace` on cwd files → auto-pass (cwd-scoped file modification)
+- `sed` on local cwd files → auto-pass (`sed -n '1,10p' ./file.txt`, `sed -i '' 's/old/new/g' ./config.toml`); `sed -i 's/...' /etc/...` → HARD STOP (escapes cwd)
+- `xargs` with a cwd-scoped command → classified by the underlying command (`cat files.txt | xargs wc -l` → auto-pass; `cat files.txt | xargs rm -rf` → ask)
+- `sort`, `uniq`, `head`, `tail`, `wc`, `cut`, `tr` on local file input → auto-pass (read-only text processing)
 - `brew install`, `brew upgrade`, `brew uninstall` → ask (writes to system paths outside cwd)
 - `brew update` → ask (modifies Homebrew installation); `brew list`, `brew info`, `brew search` → auto-pass (read-only)
 - `apt-get install`, `dnf install`, `yum install` → ask (system package manager, writes to system paths)
@@ -413,6 +436,17 @@ digraph {
 | `python -m mypy src/` | auto-pass (cwd-scoped, type check) |
 | `python -m ruff check .` | auto-pass (cwd-scoped, lint) |
 | `uv run pytest` | auto-pass (cwd-scoped) |
+| `uv sync` | auto-pass (cwd-scoped, installs from lockfile) |
+| `uv add requests` | auto-pass (cwd-scoped, adds to pyproject.toml) |
+| `uv remove requests` | auto-pass (cwd-scoped, removes from pyproject.toml) |
+| `uv venv .venv` | auto-pass (creates venv in cwd) |
+| `uv pip compile requirements.in -o requirements.txt` | auto-pass (cwd-scoped resolution) |
+| `uv tool run ruff check .` | auto-pass (cwd-scoped tool execution) |
+| `poetry install` | auto-pass (cwd-scoped) |
+| `poetry add requests` | auto-pass (cwd-scoped) |
+| `poetry run pytest` | auto-pass (cwd-scoped) |
+| `pipenv install` | auto-pass (cwd-scoped) |
+| `pipenv run python -m pytest` | auto-pass (cwd-scoped) |
 | `cargo build --release` | auto-pass (cwd-scoped) |
 | `cargo test` | auto-pass (cwd-scoped) |
 | `cargo clippy` | auto-pass (cwd-scoped) |
@@ -430,6 +464,14 @@ digraph {
 | `npx tsc --noEmit` | auto-pass (cwd-scoped, type check) |
 | `tsc --build` | auto-pass (cwd-scoped, TypeScript build) |
 | `tsc --watch` | auto-pass (cwd-scoped, TypeScript watch) |
+| `tsup src/index.ts` | auto-pass (cwd-scoped, TypeScript bundler) |
+| `tsup --dts --format esm,cjs` | auto-pass (cwd-scoped, TypeScript bundler with types) |
+| `vite build` | auto-pass (cwd-scoped, frontend build) |
+| `vite dev` | auto-pass (cwd-scoped, local dev server) |
+| `esbuild src/index.ts --bundle --outdir=dist` | auto-pass (cwd-scoped, bundler) |
+| `rollup -c rollup.config.js` | auto-pass (cwd-scoped, module bundler) |
+| `npx prettier --write .` | auto-pass (cwd-scoped, auto-format) |
+| `npx prettier --check .` | auto-pass (cwd-scoped, format check) |
 | `npx eslint src/` | auto-pass (cwd-scoped, lint) |
 | `npx vitest run` | auto-pass (cwd-scoped, test) |
 | `npx jest` | auto-pass (cwd-scoped, test) |
@@ -477,6 +519,13 @@ digraph {
 | `DATABASE_URL=postgresql://prod-db/mydb sqlx migrate run` | ask (remote DB in command line) |
 | `grep -r "pattern" ./src` | auto-pass (cwd-scoped, read-only) |
 | `sed -i '' 's/foo/bar/g' ./config.toml` | auto-pass (cwd-scoped file edit) |
+| `sed -n '1,20p' ./src/main.rs` | auto-pass (cwd-scoped read) |
+| `awk '{print $1, $3}' ./logs/app.log` | auto-pass (cwd-scoped read) |
+| `awk -F, '{sum+=$2} END{print sum}' ./data.csv` | auto-pass (cwd-scoped computation) |
+| `jq '.users[] | .name' ./data.json` | auto-pass (cwd-scoped JSON query) |
+| `cat ./output.json \| jq '.results'` | auto-pass (cwd-scoped, read-only) |
+| `cat files.txt \| xargs wc -l` | auto-pass (read-only, cwd-scoped) |
+| `cat files.txt \| xargs rm -rf` | ask (bulk deletion via xargs) |
 | `curl -o ./tool https://example.com/tool` | auto-pass (writes to cwd) |
 | `curl https://api.example.com/data` | auto-pass (GET, read-only) |
 | `curl -X POST https://api.example.com/data -d '{}'` | ask (sends data to external service) |
@@ -486,6 +535,13 @@ digraph {
 | `pg_dump -h prod-db.example.com mydb > backup.sql` | ask (remote DB) |
 | `sea-orm-cli migrate up` | auto-pass (cwd-scoped, reads config) |
 | `wasm-bindgen --target web ./target/...` | auto-pass (cwd-scoped, Rust wasm post-processing) |
+| `cargo nextest run` | auto-pass (cwd-scoped, next-gen test runner) |
+| `cargo nextest run --workspace` | auto-pass (cwd-scoped, runs all workspace tests) |
+| `cargo expand` | auto-pass (cwd-scoped, macro expansion inspection) |
+| `cargo fix` | auto-pass (cwd-scoped, applies linter suggestions) |
+| `cargo clippy --fix --allow-dirty` | auto-pass (cwd-scoped, auto-fix Clippy warnings) |
+| `cross build --target x86_64-unknown-linux-musl` | auto-pass (cwd-scoped, cross-compilation) |
+| `cargo miri test` | auto-pass (cwd-scoped, UB detection) |
 | `cargo audit` | auto-pass (read-only security audit) |
 | `npm audit` | auto-pass (read-only security audit) |
 | `pip-audit` | auto-pass (read-only Python security audit) |
@@ -521,6 +577,13 @@ digraph {
 | `aws s3 sync ./dist/ s3://bucket/` | ask (syncs to remote cloud storage) |
 | `gsutil ls gs://bucket/` | auto-pass (read-only cloud storage) |
 | `gsutil cp ./file gs://bucket/` | ask (uploads to Google Cloud Storage) |
+| `ps aux` | auto-pass (read-only process list) |
+| `ps -ef \| grep myapp` | auto-pass (read-only process inspection) |
+| `lsof -i :8080` | auto-pass (read-only, which process uses port) |
+| `netstat -an` | auto-pass (read-only network state) |
+| `ss -tuln` | auto-pass (read-only socket stats) |
+| `df -h` | auto-pass (read-only disk usage) |
+| `du -sh ./target` | auto-pass (cwd-scoped disk usage) |
 | `nc -l 8080` | auto-pass (local port listener) |
 | `nc remote.host 22` | ask (connects to remote host) |
 | `find . -name "*.rs" -exec wc -l {} \;` | auto-pass (cwd-scoped read) |
@@ -608,6 +671,9 @@ Never override this check, even in crazy-workspace mode. Secrets detection is a 
 | `git add` partially fails (some files staged, some not) | Announce partial failure, list which files failed; pause for user input before committing the partial staging |
 | Only untracked files, no modifications | Treat as "no changes" and skip |
 | Merge conflicts in working tree | Skip auto-commit; announce `[auto-commit] Skipping — merge conflicts present` |
+| Detached HEAD state | Skip auto-commit; announce `[auto-commit] Skipping — detached HEAD. Create or checkout a branch before committing.` |
+| Bare git repository | Skip auto-commit silently (no working tree — cannot stage or commit) |
+| Staged files from a previous task (not modified by Claude) | Do NOT include them in the auto-commit; stage only the files Claude modified in the current task |
 
 ### Session Log Entry
 
