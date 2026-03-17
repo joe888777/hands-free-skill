@@ -59,6 +59,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 | Speed with phase-transition safety | `/hands-free full` + `review-checkpoints on` |
 | Careful, review before execution | `/hands-free partial` (review-checkpoints always on) |
 | First-time / unfamiliar codebase | `/hands-free off` (observe only, learn preferences) |
+| Shadow mode — build preferences before enabling | `/hands-free off` + `learning high` (watch and learn, then switch to full) |
 
 > **Quick start (most users):**
 > ```
@@ -251,9 +252,10 @@ When enabled (`/hands-free auto-commit on`), automatically commit changes at nat
 ### How It Works
 
 1. Stage only the relevant changed files (`git add <specific files>`) — never `git add -A` or `git add .`
-2. Write a concise commit message following the repo's existing commit style
-3. Announce: "Auto-committed: `<short message>`"
-4. Log it in the session log
+2. Determine commit message style: run `git log --oneline -5` to see recent messages; match the format (e.g., if repo uses `feat:` / `fix:` prefixes, use those; if it uses plain sentences, match that)
+3. Write a concise commit message following that style
+4. Announce: "Auto-committed: `<short message>`"
+5. Log it in the session log
 
 ### Safety Rules
 
