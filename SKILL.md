@@ -2899,10 +2899,13 @@ If hands-free is off:
 Hands-Free Status
   Mode:       off (inactive)
   Learning:   high (still tracking choices — use /hands-free full to apply them)
+  Security:   A (0 critical, 2 high, 5 medium)
   Preferences loaded: 2 rules (1 high, 1 medium)
 
   To activate: /hands-free full
 ```
+
+The `Security:` line is shown in all modes (including off) when `.claude/security-posture.json` exists — the grade is stored on disk independently of hands-free mode. If no scan has run, `Security: unknown (run /hands-free security)`.
 
 In `off` mode, learning continues tracking choices but no auto-accept or auto-commit happens. Preferences accumulate for when the mode is re-enabled.
 
@@ -3845,6 +3848,12 @@ All scans are skipped; auto-commit proceeds normally and `.claude/security-postu
 - **Windows/WSL path handling:** The shell auto-pass rules assume Unix-style paths (`./`, `~/`, `/etc/`). In Windows Subsystem for Linux (WSL), Windows-style paths (`C:\Users\...`) in commands are treated as unknown paths and classified conservatively (ask). If using WSL and accessing Windows drives (`/mnt/c/...`), those paths are NOT considered cwd-scoped — they require user confirmation in all modes. For purely WSL-internal paths within the current working directory, standard classification applies.
 
 - **Custom MCP servers not in default list:** MCP servers built internally or installed from unlisted sources will be classified by their tool names (verb-prefix heuristic). If the tool names are ambiguous nouns, they will ask. Document your internal MCP tools in CLAUDE.md with explicit read/write overrides for consistent behavior.
+
+- **Security scan grade may be stale:** The grade shown in `/hands-free status` reflects the last scan, not the current state of the codebase. If significant code has been added between scans, the displayed grade may not reflect new vulnerabilities. Run `/hands-free security --scan` to force a fresh scan.
+
+- **Security scans run only at auto-commit time (or on demand):** Security scanning is not triggered by reads, shell commands, or file edits — only by auto-commit (before staging) and explicit `/hands-free security --scan`. Projects with `auto-commit: off` will not accumulate scan data unless `/hands-free security --scan` is run manually.
+
+- **30-second per-scanner timeout:** Very large projects may hit the per-scanner timeout (FR-1), causing a scanner to be skipped for that run. The skip is logged to `.claude/security-scan.log`. If a scanner consistently times out, use `skip-scanners` in CLAUDE.md and run it separately.
 
 ---
 
