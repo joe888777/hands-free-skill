@@ -3631,7 +3631,7 @@ Add a `# hands-free security` section to CLAUDE.md to configure security scannin
 | Key | Accepted values | Default | Effect |
 |---|---|---|---|
 | `block-on` | `critical`, `high`, `none` | `critical` | Sets the minimum severity that blocks auto-commit. `critical` — only critical findings block (default). `high` — high and critical findings block. `none` — never block; all findings are warn-only. |
-| `skip-scanners` | Comma-separated scanner names: `cargo-audit`, `bandit`, `npm-audit`, `pip-audit`, `semgrep` | _(none)_ | Disables the listed scanners entirely for this project. Skipped scanners are logged as `[scanner-name] skipped — disabled by CLAUDE.md`. |
+| `skip-scanners` | Comma-separated scanner names: `cargo-audit`, `bandit`, `npm-audit`, `pip-audit`, `semgrep`, `safety`, `trivy`, `grype` | _(none)_ | Disables the listed scanners entirely for this project. Skipped scanners are logged as `[scanner-name] skipped — disabled by CLAUDE.md`. |
 | `allow-patterns` | Comma-separated literal strings | _(none)_ | Whitelists literal strings that appear in scanner output. Findings whose message contains a whitelisted string are downgraded to Info and never block, even if the base severity is critical. Use for known false positives (e.g., test fixtures, documentation strings). |
 
 **Notes:**
