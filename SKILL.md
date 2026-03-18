@@ -3469,7 +3469,7 @@ For time-based promises, include remaining time:
 **Security scan health check.** After the build state health check, check for security vulnerabilities from the previous iteration:
 - Read `.claude/security-posture.json` (if it exists)
 - If the file is missing (no scan has been run yet) → skip gracefully; log a warning: `[hands-free] Security scan not yet run — skipping security health check`
-- If grade is **C, D, or F** → route to systematic-debugging with context: include the top vulnerabilities from `security-posture.json` so the debugging skill can address them
+- If grade is **C, D, or F** → route to systematic-debugging with context: read the critical and high findings from `.claude/security-scan.log` (the last scan block) and include the top 5 most severe findings so the debugging skill can address them
 - If grade is **A or B** → continue with normal phase routing (no rerouting needed)
 - If the scanner tool is not installed (e.g., `cargo audit`, `pip-audit`, `npm audit` missing) → skip gracefully with warning: `[hands-free] Security scanner not installed — skipping security health check`
 
