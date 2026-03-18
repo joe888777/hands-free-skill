@@ -762,7 +762,8 @@ A shell command is **scoped to the current directory** if it contains no paths t
   - `npx standard-version` → ask (creates commits/tags and may publish)
   - `release-it --dry-run` → auto-pass (read-only); `release-it` → ask (creates release, may push/publish)
 - **Code quality tools:**
-  - `semgrep ./` / `semgrep --config auto ./` → auto-pass (cwd-scoped static analysis)
+  - `semgrep ./` / `semgrep --config ./rules/ ./` → auto-pass (cwd-scoped static analysis, local rules only)
+  - `semgrep --config auto ./` / `semgrep --config p/...` → ask (downloads rules from Semgrep registry — network op; may upload code snippets)
   - `codeql database create` → ask (writes to a specified path — check if cwd); `codeql analyze ./db` → auto-pass if analyzing cwd database
   - `sonar-scanner` (with `sonar.host.url=localhost`) → auto-pass; remote SonarQube server → ask (sends code to external server)
   - `eslint --fix ./src` → auto-pass (cwd-scoped auto-fix)
@@ -2235,7 +2236,7 @@ digraph {
 | `cargo audit` | auto-pass (read-only security audit) |
 | `npm audit` | auto-pass (read-only security audit) |
 | `pip-audit` | auto-pass (read-only Python security audit) |
-| `snyk test` | auto-pass (read-only vulnerability scan) |
+| `snyk test` | ask (sends dependency info to Snyk servers — external API) |
 | `cp file.txt /etc/config` | ask (escapes cwd) |
 | `rm -rf ~/.config/app` | ask (escapes cwd) |
 | `curl -o /usr/local/bin/tool ...` | ask (writes outside cwd) |
@@ -3410,6 +3411,18 @@ When the `/hands-free security` command reads `.claude/security-scan.log` to dis
 
 For `bandit` and `semgrep`, there is no "package" or "fix version" (these are code-level findings, not dependency vulnerabilities). Use the file path and line number as the location, and the rule ID as the advisory-id.
 
+**Severity normalization:** Different scanners use different severity scales. Normalize all raw severities to the critical/high/medium/low scale used in grade computation:
+
+| Scanner | Raw severity levels | Normalized |
+|---|---|---|
+| `cargo audit` | CRITICAL, HIGH, MEDIUM, LOW | Direct 1:1 |
+| `npm audit` | critical, high, moderate, low, info | critical→critical, high→high, moderate→medium, low→low, info→info |
+| `pip-audit` | Critical, High, Medium, Low | Direct 1:1 |
+| `bandit` | HIGH, MEDIUM, LOW | HIGH→high, MEDIUM→medium, LOW→low *(no critical level — bandit HIGH is a code anti-pattern, not an exploitable CVE)* |
+| `semgrep` | CRITICAL, ERROR, WARNING, INFO | CRITICAL→critical, ERROR→high, WARNING→medium, INFO→low |
+
+Note: `bandit` never produces critical findings; its highest level is HIGH, which maps to "high". This means `bandit` alone cannot trigger the default `block-on: critical` threshold — it can only trigger blocking when `block-on: high` is set in CLAUDE.md.
+
 When a scanner's output cannot be parsed (malformed, unexpected format), log the raw output and treat the entry as severity unknown (do not count toward grade).
 
 ### Scan Output Files
@@ -4167,6 +4180,15 @@ Or raise the threshold to only block on critical (default) or high:
 - block-on: critical
 ```
 
+### "Bandit findings are not blocking my auto-commit even though `block-on: critical` is set"
+
+`bandit` uses HIGH/MEDIUM/LOW severity — it has no CRITICAL level. Bandit's highest severity (HIGH) maps to "high" in the normalized grade, not "critical". With the default `block-on: critical`, bandit findings never block auto-commit. To block on bandit HIGH findings, set `block-on: high` in the project's CLAUDE.md:
+```markdown
+# hands-free security
+- block-on: high
+```
+This promotes bandit HIGH (and all other scanners' HIGH-severity findings) to blocking status.
+
 ### "The `/hands-free security` command shows 'No security scan data available'"
 
 No scan has run yet for this project. Either: (1) Run `/hands-free security --scan` to trigger a scan immediately, or (2) enable auto-commit (`/hands-free auto-commit on`) — a scan will run automatically before the next commit. If scanners are available but the scan is still empty after `--scan`, check that the `.claude/` directory is writable.
@@ -4249,7 +4271,7 @@ Two tiers of hard stops:
 - Any diff content matching the content signal patterns in the Secrets Detection section
 
 **Critical vulnerabilities found by security scanning** *(HARD STOP for auto-commit in ALL modes; configurable via CLAUDE.md `block-on:` key)*
-- When `cargo audit`, `bandit`, `npm audit`, or `pip-audit` reports a critical-severity finding, auto-commit is blocked in all modes until the user resolves or explicitly sets `block-on: none` in the project's `# hands-free security` CLAUDE.md section
+- When `cargo audit`, `npm audit`, `pip-audit`, or `semgrep` (CRITICAL-level rule) reports a critical-severity finding, auto-commit is blocked in all modes until the user resolves or explicitly sets `block-on: none` in the project's `# hands-free security` CLAUDE.md section. Note: `bandit` never produces critical findings (its highest level is HIGH — see severity normalization table); bandit can trigger blocking only when `block-on: high` is configured.
 - Announcement: `[security] Auto-commit blocked — N critical vulnerabilities found`
 - High-severity findings warn but do not block by default; promote to blocking with `block-on: high`
 - Scanner not installed → skip gracefully (not a hard stop)
