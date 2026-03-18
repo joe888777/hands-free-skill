@@ -2584,6 +2584,7 @@ Filename patterns to block:
 - `*.secret`, `credentials.json`, `secrets.yaml`, `secrets.yml`, `*.keystore`
 - `.npmrc` — often contains `//registry.npmjs.org/:_authToken=` publish tokens
 - `*.cer`, `*.der`, `*.crt` — certificate files that may include private key material
+- `.aws/credentials` — AWS credential file containing `aws_access_key_id` and `aws_secret_access_key`
 
 Content signals in staged diffs (case-insensitive):
 - **Generic token prefixes:** `sk-`, `ghp_`, `gho_`, `ghs_`, `ghr_` (GitHub tokens), `AKIA`/`AGPA`/`AROA`/`ASIA`/`AIPA`/`ANPA`/`ANVA`/`APKA` (AWS credential prefixes), `xoxb-`, `xoxp-`, `xoxe-` (Slack tokens)
@@ -2595,12 +2596,21 @@ Content signals in staged diffs (case-insensitive):
 - **Hardcoded connection strings with credentials:** `postgres://user:pass@`, `postgresql://user:pass@`, `mongodb+srv://user:pass@`, `amqp://user:pass@`, `redis://:password@`, `mysql://user:pass@` (any URI with a password component before `@`)
 - **Cloudflare tokens:** `CF_API_TOKEN=` assignment with non-placeholder value; `CF_API_KEY=` (global API key)
 - **Vault/Consul tokens:** `s.` followed by 24+ chars (Vault token format); `hvs.` (HashiCorp Vault Service Token)
+- **CI/CD platform tokens:** `GITHUB_TOKEN=`, `GITLAB_TOKEN=`, `BITBUCKET_APP_PASSWORD=` assignment patterns with non-placeholder values
+- **DATABASE_URL with embedded credentials:** `DATABASE_URL=postgresql://user:password@`, `DATABASE_URL=mysql://user:password@`, `DATABASE_URL=postgres://user:password@` — explicit environment variable assignment with credentials in the URI
+- **PEM blocks in any file extension:** `-----BEGIN` marker in any file (not just `.pem`) — private keys and certificates are often embedded in `.txt`, `.conf`, `.js`, `.ts`, `.env`, and other files
+- **Base64-encoded HTTP credentials:** `Authorization: Basic ` followed by a base64 string hardcoded in source — indicates embedded credentials rather than a runtime-injected value
+- **High-entropy strings:** Any quoted string literal longer than 20 characters with estimated Shannon entropy above 4.5 bits/char (characteristic of randomly generated tokens, keys, and passwords) — applies to assignment RHS values and string arguments, not natural-language prose
 
 **False positive reduction:** Do NOT fire on:
 - Lines prefixed with `#` (comments) — these are documentation
 - Files in `test/`, `tests/`, `spec/`, `__tests__/`, `fixtures/`, `examples/` directories — test files routinely contain fake credentials
 - Values that are clearly placeholders: `your-api-key-here`, `<YOUR_TOKEN>`, `REPLACE_ME`, `example`, `placeholder`, `changeme`, `test-secret`, `dummy`, `fake-key`, `xxx`
 - Environment variable references: `process.env.API_KEY`, `os.environ["SECRET"]`, `$API_KEY`, `${TOKEN}` — these reference env vars, not embed values
+- `GITHUB_TOKEN`, `GITLAB_TOKEN`, `BITBUCKET_APP_PASSWORD` when used as bare variable names (no `=` or assigned a placeholder/env-ref value) — these are references, not leaks
+- `Authorization: Basic ` followed by a clearly placeholder base64 value such as `dXNlcjpwYXNz` (decodes to `user:pass`) or other well-known test strings
+- High-entropy false positives: minified JS/CSS bundles, lock files (`package-lock.json`, `Cargo.lock`, `yarn.lock`), binary blobs, and UUIDs (fixed 36-char format with hyphens) should NOT trigger entropy checks
+- `DATABASE_URL=` when the value is a placeholder template like `postgresql://user:password@localhost/db` or uses `${...}` substitution
 
 Never override this check, even in crazy-workspace mode. Secrets detection is a hard stop in all modes.
 
