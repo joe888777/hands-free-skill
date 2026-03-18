@@ -3322,7 +3322,7 @@ Grade: C  (2 critical, 1 high, 3 medium, 0 low)
 Full report: .claude/security-report.md
 ```
 
-**Grade scale:** A = 0 critical/high; B = 0 critical, ≤3 high; C = 1–3 critical OR ≤10 high; D = 4+ critical; F = 10+ critical.
+**Grade scale:** A = 0 critical, <5 high; B = 0 critical, 5–15 high; C = 1–2 critical; D = 3+ critical; F = scan error.
 
 **If no scan has been run yet**, output:
 ```
@@ -3417,9 +3417,9 @@ Add a `# hands-free security` section to your project's CLAUDE.md to customize s
 
 ```markdown
 # hands-free security
-block-on: high
-skip-scanners: cargo-audit, bandit
-allow-patterns: test_credentials, example_token
+- block-on: high
+- skip-scanners: cargo-audit, bandit
+- allow-patterns: test_credentials, example_token
 ```
 
 | Option | Values | Effect |
