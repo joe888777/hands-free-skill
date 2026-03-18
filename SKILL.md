@@ -2652,7 +2652,7 @@ Multiple scanners may apply to the same repo (e.g., a Python + Rust mixed projec
    ```
    [YYYY-MM-DD HH:MM:SS] [scanner-name] skipped — no rules directory
    ```
-4. Ensure `.claude/security-scan.log` is listed in the repo's `.gitignore` on the first scan of a session (add the line if absent; do NOT commit the `.gitignore` change as a separate commit — include it with the next auto-commit that would have occurred anyway, or announce and skip if there is no pending auto-commit).
+4. Ensure `.claude/security-scan.log`, `.claude/security-posture.json`, and `.claude/security-report.md` are all listed in the repo's `.gitignore` on the first scan of a session (add any missing lines; do NOT commit the `.gitignore` change as a separate commit — include it with the next auto-commit that would have occurred anyway, or announce and skip if there is no pending auto-commit).
 5. After aggregating results from all scanners that ran (non-skipped), compute a security posture grade from the total critical and high counts across all scanners:
    - **A**: 0 critical, fewer than 5 high
    - **B**: 0 critical, 5–15 high
@@ -2669,7 +2669,7 @@ Multiple scanners may apply to the same repo (e.g., a Python + Rust mixed projec
      "scanned_at": "YYYY-MM-DD HH:MM:SS"
    }
    ```
-   This file is read by `/hands-free status` to populate the `Security:` line. If the file does not exist (no scan has run yet), `/hands-free status` shows `Security: unknown (run /hands-free security)`. Ensure `.claude/security-posture.json` is listed in `.gitignore` (add alongside `.claude/security-scan.log` if absent).
+   This file is read by `/hands-free status` to populate the `Security:` line. If the file does not exist (no scan has run yet), `/hands-free status` shows `Security: unknown (run /hands-free security)`.
 
 **Severity handling:**
 
