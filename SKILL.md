@@ -3380,6 +3380,28 @@ After each scan, hands-free computes a posture grade from the total findings acr
 
 The grade is written to `.claude/security-posture.json` and displayed in `/hands-free status` and (in loop mode) in iteration start announcements and auto-commit messages.
 
+### Scanner Output Parsing
+
+When the `/hands-free security` command reads `.claude/security-scan.log` to display findings, it normalizes each scanner's raw output into a consistent per-finding format:
+
+```
+[scanner]: [advisory-id] — [package]@[version] → fix: [fix-description]
+```
+
+**Per-scanner parsing rules:**
+
+| Scanner | JSON flag | Key fields to extract |
+|---|---|---|
+| `cargo audit` | `--json` (optional; default text output is also parseable) | `advisory.id` → advisory-id; `package.name + package.version` → package@version; `versions.patched` → fix version |
+| `npm audit` | `--json` (default for `npm audit`; parse `vulnerabilities` object) | `via[].url` or advisory ID; `name + range` → package; `fixAvailable.version` → fix version |
+| `pip-audit` | `--format json` (add when running) | `vulns[].id` → advisory-id; `name + version` → package; `fix_versions` → fix version |
+| `bandit` | `-f json` (add when running) | `results[].issue_severity` → severity; `results[].filename + line_number` → location; `results[].issue_text` → description |
+| `semgrep` | `--json` (add when running) | `results[].check_id` → rule ID; `results[].path + start.line` → location; `results[].extra.message` → description |
+
+For `bandit` and `semgrep`, there is no "package" or "fix version" (these are code-level findings, not dependency vulnerabilities). Use the file path and line number as the location, and the rule ID as the advisory-id.
+
+When a scanner's output cannot be parsed (malformed, unexpected format), log the raw output and treat the entry as severity unknown (do not count toward grade).
+
 ### Scan Output Files
 
 | File | Purpose | Committed? |
