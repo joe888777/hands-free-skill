@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.23.0] — 2026-03-19
+
+### Added
+
+**Loop Skip Command**
+- `/hands-free loop-skip` — immediately stops all remaining work in the current iteration and signals the loop to advance to the next iteration
+- Does NOT commit in-progress (unstaged) changes when skipping; if unstaged changes exist, announces a warning: `[hands-free] loop-skip: unstaged changes present — not committed`
+- Announces: `[hands-free] Iteration skipped — advancing to next iteration`
+- Skipped iterations do NOT consume the completion promise check — the promise is re-evaluated fresh at the start of the next iteration
+- If invoked outside loop-aware mode, announces: `[hands-free] loop-skip has no effect outside loop mode`
+- Loop-skip is logged: `[loop-skip] iteration N skipped — advancing`
+- Added to Quick Reference table: "Discard remaining work in current iteration, advance to next"
+- Added to Commands block with comment: "skip remaining work in current iteration and advance to next"
+- New `loop-skip` row in `### Loop Pause and Resume Commands` table distinguishing it from `loop-pause` (loop-skip = abandon immediately, loop-pause = finish cleanly then pause)
+
 ## [2.22.0] — 2026-03-19
 
 ### Added
