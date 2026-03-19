@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.17.0
+version: 2.18.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -5000,6 +5000,28 @@ This promotes bandit HIGH (and all other scanners' HIGH-severity findings) to bl
 ### "The `/hands-free security` command shows 'No security scan data available'"
 
 No scan has run yet for this project. Either: (1) Run `/hands-free security --scan` to trigger a scan immediately, or (2) enable auto-commit (`/hands-free auto-commit on`) — a scan will run automatically before the next commit. If scanners are available but the scan is still empty after `--scan`, check that the `.claude/` directory is writable.
+
+### Loop Mode Issues
+
+### "The loop keeps re-brainstorming instead of resuming where it left off"
+
+The checkpoint SHA check failed — either `.claude/iteration-checkpoint.json` is missing, stale, or its `sha` field doesn't match the current HEAD. Hands-free treats a failed SHA check as "no prior context" and routes to brainstorming from scratch. To recover: ensure the checkpoint was written at the end of the last iteration (check that the checkpoint file exists and `sha` matches `git rev-parse HEAD`). If the checkpoint is corrupt, delete it and let the loop re-plan from scratch on the next iteration.
+
+### "Auto-stop fired but my health score looks fine"
+
+The health floor consecutive counter is tracked in session memory only — it resets when the conversation ends. If you restarted the session, the counter was at zero even if health was low in previous sessions. The current iteration's `health_score < 25` check restarted the count from 1. To suppress false positives: add `- Loop auto-stop: off` to CLAUDE.md to disable both conditions, or raise the threshold with `- Loop health floor: 10` (a more lenient floor).
+
+### "Velocity stall warning fires even though stories are completing"
+
+`stories_completed_this_iteration` is computed from the length of `completed_stories` in the checkpoint at the time of the checkpoint write. If stories were closed in the beads tracker but `completed_stories` was not updated in the checkpoint JSON, the count stays 0. Inspect the checkpoint: `cat .claude/iteration-checkpoint.json | jq '.completed_stories'`. If it shows an empty array despite stories being closed, the checkpoint write did not capture them — verify that the checkpoint write step ran after story closure.
+
+### "Health score is always 50 even with passing tests"
+
+The Test Health pillar reads `test_summary.failed` and `test_summary.passed` from the checkpoint. If `test_summary` is missing or null, the pillar defaults to 50 — it does not read test output directly. The `test_summary` field must be written to the checkpoint during each iteration. Verify: `cat .claude/iteration-checkpoint.json | jq '.test_summary'`. If it shows `null`, the test runner output capture step is not running or not writing to the checkpoint.
+
+### "The loop re-brainstorms every iteration even with a fresh checkpoint"
+
+Two likely causes: (1) `pending_stories` in the checkpoint is an empty array — when all stories appear done, hands-free routes to verification rather than re-brainstorming, but if verification also passes it goes to finishing rather than looping. If the loop is re-brainstorming, `pending_stories` may be missing (null) rather than empty, triggering the "no plan" route. (2) `active_plan_file` is not set in the checkpoint, so hands-free cannot load the plan and defaults to planning from scratch. Check: `cat .claude/iteration-checkpoint.json | jq '{pending: .pending_stories, plan: .active_plan_file}'`.
 
 ## HARD STOP — Always Pause
 

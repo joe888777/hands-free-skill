@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.18.0] — 2026-03-19
+
+### Added
+
+**Loop-Mode Troubleshooting Entries**
+- New `### Loop Mode Issues` group at end of `## Troubleshooting` with 5 Q&A entries covering the most common loop-mode failure scenarios:
+  - Loop re-brainstorming instead of resuming (checkpoint SHA mismatch)
+  - Auto-stop false positive (session-scoped consecutive counter resets)
+  - Velocity stall false positive (completed_stories not written to checkpoint)
+  - Health score stuck at 50 (test_summary missing from checkpoint)
+  - Loop re-brainstorming every iteration (pending_stories null or active_plan_file not set)
+
 ## [2.17.0] — 2026-03-19
 
 ### Added
