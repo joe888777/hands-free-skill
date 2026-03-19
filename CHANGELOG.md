@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.7.0] — 2026-03-19
+
+### Added
+
+**Security Remediation Automation**
+- `### Auto-Fix Behavior`: two-phase dry-run-first protocol auto-fixes medium/low vulnerabilities using `npm audit fix`, `pip-audit --fix`, and `bundle update --conservative`; `cargo audit` has no dry-run, so it emits a fix command instead
+- `### High/Critical Fix Commands`: HARD STOP messages now include copy-paste-ready fix commands (`npm audit fix --force`, `cargo update -p <crate>`, `pip install --upgrade <pkg>==<version>`) so users know exactly what to run
+- `/hands-free security fix` subcommand: on-demand remediation — detects project type, runs scanner, applies auto-fix for medium/low, emits fix commands for high/critical, updates posture grade
+- `/hands-free security fix` added to Commands block and Quick Reference table
+- `### Remediation History`: `remediation_history` array in `.claude/security-posture.json` records each fix attempt (date, scanner, severity_fixed, command, outcome); capped at 20 entries (FIFO)
+- Loop stall detection via remediation history: 3 consecutive `failed` outcomes for same scanner → route to systematic-debugging
+
 ## [2.6.0] — 2026-03-19
 
 ### Added

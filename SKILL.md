@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.6.0
+version: 2.7.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -26,6 +26,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | Pause before phase transitions | `/hands-free review-checkpoints on` |
 > | Preview how a command would be classified | `/hands-free check <command>` |
 > | View vulnerability summary | `/hands-free security` |
+> | Auto-remediate vulnerabilities on demand | `/hands-free security fix` |
 > | Check workspace health (git, build, tests, security) | `/hands-free health` |
 >
 > **Always blocked (all modes):** `curl|bash`, `source <(curl)`, language RCE (`python -c exec`, `node -e eval`, `deno run <url>`), `chmod 777`, secrets in commits, `rm -rf *`, `rm -rf .git`
@@ -55,6 +56,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free check <cmd>  # would this command auto-pass? Shows classification without running it
 /hands-free security     # show vulnerability summary from last security scan
 /hands-free security --scan  # force a fresh security scan immediately
+/hands-free security fix  # on-demand remediation: auto-fix medium/low, emit fix cmds for high/critical
 /hands-free health       # workspace health report (git state, build, tests, security posture)
 ```
 
@@ -3527,6 +3529,84 @@ Full report: .claude/security-report.md
 
 Add `--scan` to force a fresh scan immediately: `/hands-free security --scan`.
 
+### `/hands-free security fix`
+
+Run `/hands-free security fix` to trigger on-demand remediation outside the auto-commit flow.
+
+**Execution sequence:**
+
+1. Detect project type from root-level config files (same logic as auto-commit pre-scan)
+2. Run the appropriate scanner(s) and collect findings
+3. For **medium/low** findings: apply auto-fix using the two-phase protocol (dry-run → apply)
+4. For **high/critical** findings: emit the copy-paste fix command; do not auto-apply
+5. Re-run scanner after fixes to confirm resolution and compute new posture grade
+6. Update `.claude/security-posture.json` with the new grade and append to `remediation_history`
+7. Report outcome
+
+**Outcome report format:**
+
+```
+[security] Fix complete — 3 findings resolved, 1 finding requires manual review
+  Resolved: npm-audit (2 medium), pip-audit (1 low)
+  Manual:   cargo-audit: RUSTSEC-2024-0001 — openssl 0.10.55. Run: cargo update -p openssl
+Grade updated: B → A
+```
+
+**When no scanner is available:**
+
+```
+[security] No scanner available for Node.js — install npm (comes with Node.js) to enable auto-fix
+```
+
+**Works in all modes** when explicitly invoked (full, partial, off, crazy-workspace). In crazy-workspace, applies fixes for high severity findings as well as medium/low.
+
+### Remediation History
+
+Every auto-fix attempt and every `/hands-free security fix` run appends an entry to the `remediation_history` array in `.claude/security-posture.json`. This lets the loop track whether successive iterations are making progress or stalling.
+
+**Schema:**
+
+```json
+{
+  "grade": "B",
+  "last_scan": "2026-03-19T13:42:00Z",
+  "critical": 0,
+  "high": 1,
+  "medium": 2,
+  "low": 5,
+  "remediation_history": [
+    {
+      "date": "2026-03-19T13:42:00Z",
+      "scanner": "npm-audit",
+      "severity_fixed": ["medium", "low"],
+      "command": "npm audit fix",
+      "outcome": "resolved"
+    },
+    {
+      "date": "2026-03-19T14:01:00Z",
+      "scanner": "cargo-audit",
+      "severity_fixed": ["high"],
+      "command": "cargo update -p openssl",
+      "outcome": "partial"
+    }
+  ]
+}
+```
+
+**`outcome` values:**
+
+| Value | Meaning |
+|---|---|
+| `resolved` | All targeted findings were eliminated after re-scan |
+| `partial` | Some findings eliminated, others remain |
+| `failed` | Fix command ran but re-scan shows same findings |
+
+**Cap at 20 entries:** When a new entry would exceed 20 records, remove the oldest entry (FIFO) before appending. The cap prevents unbounded file growth in long-running loops.
+
+**Loop integration — stall detection:** If the last 3 `remediation_history` entries for the **same scanner** all have `outcome: failed`, hands-free routes the current loop iteration to `systematic-debugging` instead of re-attempting the fix. This prevents the loop from spinning on a vulnerability with no viable automated fix.
+
+Stall detection condition: `remediation_history.slice(-3).filter(e => e.scanner === <current-scanner> && e.outcome === 'failed').length === 3`
+
 ### CLAUDE.md Security Override Syntax
 
 Add a `# hands-free security` section to your project's CLAUDE.md to customize scanning:
@@ -3556,6 +3636,78 @@ Add a `# hands-free security` section to your project's CLAUDE.md to customize s
 - **Time budget exceeded (30s across all scanners):** Stop and warn: `[security] Scan budget exceeded — partial results only`
 - **Scanner output unparseable:** Log raw output to `.claude/security-scan.log`, treat as warning (non-blocking)
 - **`.claude/` directory doesn't exist:** Create it silently on first scan
+
+### Auto-Fix Behavior
+
+When security scanning detects vulnerabilities, hands-free applies auto-fix for **medium and low** severity findings using the project's native audit-fix command. High and critical findings are never auto-fixed — they require explicit user action (see [High/Critical Fix Commands](#highcritical-fix-commands) below).
+
+**Two-phase auto-fix protocol:**
+
+1. Run the scanner's `--dry-run` variant first and inspect the exit code
+2. If the dry-run succeeds (exit 0 or indicates safe changes only), run without `--dry-run` to apply
+3. After applying, re-run the scanner to confirm the finding is resolved
+4. If still present after fix: log `[security] Auto-fix incomplete — <finding> persists after fix attempt. Continuing.` and proceed (do not block)
+
+**Per-scanner auto-fix commands (medium/low only):**
+
+| Scanner | Dry-Run Command | Apply Command |
+|---|---|---|
+| `npm audit` | `npm audit fix --dry-run` | `npm audit fix` |
+| `cargo audit` | *(no dry-run flag)* — skip auto-fix; treat as high severity | `cargo update -p <crate>` |
+| `pip-audit` | `pip-audit --fix --dry-run` | `pip-audit --fix` |
+| `bandit` | *(code-level findings; no fix command)* — skip auto-fix | N/A |
+| `semgrep` | *(code-level findings; no fix command)* — skip auto-fix | N/A |
+
+**Announcement format:** `[security] Auto-fixed N medium/low findings via npm audit fix`
+
+**When dry-run not supported:** If the scanner has no dry-run variant (e.g., `cargo audit`), skip auto-fix entirely for that scanner and treat findings as high severity: emit the fix command in the HARD STOP message rather than auto-applying.
+
+**Severity gate:** Auto-fix is strictly limited to medium and low findings. If a scan returns a mix of severities, auto-fix is applied only to the medium/low subset; high/critical subset is reported via HARD STOP.
+
+**In crazy-workspace:** Auto-fix applies to high severity findings as well (in addition to medium/low), since crazy-workspace is designed for local/throwaway repos where speed takes priority.
+
+### High/Critical Fix Commands
+
+When a high or critical vulnerability blocks auto-commit, hands-free emits a precise, copy-paste-ready fix command as part of the HARD STOP message so the user knows exactly what to run.
+
+**HARD STOP message format:**
+
+```
+[security] Auto-commit blocked — critical: <finding>. Run: <fix-command>
+```
+
+**Per-scanner fix commands for high/critical:**
+
+| Scanner | Fix Command Template |
+|---|---|
+| `npm audit` | `npm audit fix --force` |
+| `cargo audit` | `cargo update -p <crate>` |
+| `pip-audit` | `pip install --upgrade <package>==<safe-version>` |
+| `bandit` | *(code-level finding — no package fix; see finding location)* |
+| `semgrep` | *(code-level finding — no package fix; see rule ID and file path)* |
+
+**When no safe version is available:**
+
+```
+[security] No automated fix available for <finding> — manual review required
+```
+
+**Multiple high/critical findings:** Emit one fix command per finding, each on its own line:
+
+```
+[security] Auto-commit blocked — 2 high/critical findings.
+  cargo-audit: RUSTSEC-2024-0001 — openssl 0.10.55. Run: cargo update -p openssl
+  npm-audit:   CVE-2024-12345    — lodash@4.17.20.   Run: npm audit fix --force
+```
+
+**Code-level findings (bandit, semgrep):** Include the file path and line number instead of a fix command:
+
+```
+[security] Auto-commit blocked — bandit: B101 (hardcoded password) in src/config.py:42
+  Action: Review and remove hardcoded credential. See .claude/security-report.md for details.
+```
+
+**In crazy-workspace:** High/critical findings do not block auto-commit; they emit a warning only. The fix command is still printed but does not halt execution.
 
 ### Troubleshooting
 
