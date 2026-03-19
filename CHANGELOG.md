@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.45.0] — 2026-03-19
+
+### Added
+- `Loop commit prefix: <prefix>` CLAUDE.md directive: replaces `[ralph #N]` tag in loop mode auto-commit messages
+- Supports `{N}` placeholder in the prefix for iteration number injection (e.g., `iter-{N}:` → `iter-3: feat: ...`)
+- Applies only to auto-commits made during loop mode; non-loop commits unaffected
+- New row added to Available Persistent Settings table
+
 ## [2.44.0] — 2026-03-19
 
 ### Added

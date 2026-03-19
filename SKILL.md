@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.44.0
+version: 2.45.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4558,6 +4558,27 @@ When `Loop test command: <cmd>` is set in CLAUDE.md, hands-free uses the specifi
 
 **Default:** absent — test command is auto-detected from the project type.
 
+### Loop Commit Prefix
+
+When `Loop commit prefix: <prefix>` is set in CLAUDE.md, hands-free uses the specified string instead of the default `[ralph #N]` tag at the start of auto-commit messages during loop mode.
+
+**`{N}` placeholder:** If the prefix contains `{N}`, hands-free replaces `{N}` with the current iteration number at commit time.
+
+**Examples:**
+
+| Setting | Commit message |
+|---|---|
+| `Loop commit prefix: [ci]` | `[ci] feat: add user validation` |
+| `Loop commit prefix: iter-{N}:` | `iter-3: feat: add user validation` |
+| `Loop commit prefix: [loop/{N}]` | `[loop/7] fix: handle null response` |
+| (absent) | `[ralph #3] feat: add user validation` |
+
+**Spacing:** The prefix is prepended to the commit subject exactly as specified. If the prefix ends with a space, no additional space is added between the prefix and the message body. If it does not end with a space, a single space separates the prefix from the message.
+
+**Scope:** Applies only to auto-commits made during loop mode. Manual commits and auto-commits made outside of a loop are unaffected.
+
+**Default:** absent — `[ralph #N]` prefix is used for all loop mode auto-commits.
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -4934,6 +4955,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop quiet mode: on/off` | `Loop quiet mode: on` | When `on`, suppresses routine per-iteration announcements (iteration-start status, cooldown/backoff waits, auto-commit messages, auto-push success); warnings, HARD STOPs, mandatory checkpoints, and final-iteration notices are always printed; session log still captures all events; default: `off` |
 | `Loop abort on regression: on/off` | `Loop abort on regression: on` | When `on`, fires a HARD STOP at the start of an iteration if the failing test count increased from the previous iteration; first iteration skips comparison; baseline resets after `/hands-free resume`; compatible with `Loop max failures`; default: `off` |
 | `Loop test command: <cmd>` | `Loop test command: cargo test --quiet` | Overrides the auto-detected test runner for all loop health checks (build check, promise evaluation, regression tracking, max-failures, auto-stop); exit 0 = pass, non-zero = fail; absent by default (auto-detection used) |
+| `Loop commit prefix: <prefix>` | `Loop commit prefix: [ci]` | Replaces the default `[ralph #N]` tag at the start of loop mode auto-commit messages; use `{N}` in the prefix to include the iteration number (e.g., `iter-{N}:`); applies to loop mode auto-commits only; absent by default |
 
 ### Command-Level Overrides
 
