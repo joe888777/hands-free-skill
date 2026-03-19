@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.38.0
+version: 2.39.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4451,6 +4451,23 @@ The summary is output to the conversation — it is not written to a file. To pe
 
 **Default:** off — no per-iteration summary is output.
 
+### Loop Session Stats
+
+When `Loop session stats: on` is set in CLAUDE.md, hands-free outputs an aggregate session summary when the loop ends for any reason (promise met, max-iterations reached, user stop, HARD STOP):
+
+```
+[hands-free] Loop session complete:
+  Iterations:  N total (N completed, N skipped, N failed)
+  Commits:     N total across the session
+  Tests:       N passing / N failing (final state)
+  Elapsed:     ~N minutes
+  End reason:  promise met | max-iterations | user-stop | hard-stop
+```
+
+The stats are output to the conversation and are not written to a file. Compatible with `Loop iteration summary: on` — both can be enabled simultaneously to get per-iteration detail AND a final aggregate.
+
+**Default:** off — no session summary is output at loop end.
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -4822,6 +4839,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop pre-iteration: <command>` | `Loop pre-iteration: git pull --ff-only` | Runs the specified shell command at the start of each iteration before any work begins; if the command fails (non-zero exit), fires a HARD STOP before the iteration proceeds; same shell rules apply; absent by default |
 | `Loop cooldown: N` | `Loop cooldown: 30` | Enforces a minimum N-second pause between the end of one iteration and the start of the next; if the iteration took longer than N seconds, no artificial delay is added; cooldown does not apply after manual resume; absent by default |
 | `Loop iteration summary: on/off` | `Loop iteration summary: on` | When `on`, outputs a brief structured summary (status, commits, test results, warnings) at the end of each iteration to the conversation; distinct from `Loop notes: on` which writes to a file; default: `off` |
+| `Loop session stats: on/off` | `Loop session stats: on` | When `on`, outputs an aggregate session summary (total iterations, completed/skipped/failed counts, total commits, final test state, elapsed time) when the loop ends for any reason; compatible with `Loop iteration summary: on`; default: `off` |
 
 ### Command-Level Overrides
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.0] — 2026-03-19
+
+### Added
+- `Loop session stats: on/off` CLAUDE.md directive: outputs an aggregate session summary when the loop ends
+- Summary includes: total iterations, completed/skipped/failed counts, total commits, final test state, elapsed time, end reason
+- Fires regardless of how the loop ends (promise met, max-iterations, user stop, HARD STOP)
+- Compatible with `Loop iteration summary: on`; both can be active simultaneously
+- New row added to Available Persistent Settings table
+
 ## [2.38.0] — 2026-03-19
 
 ### Added
