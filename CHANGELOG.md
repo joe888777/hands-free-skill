@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.51.0] — 2026-03-19
+
+### Added
+- `Loop post-iteration hook: <cmd>` CLAUDE.md directive: runs a shell command at the end of each iteration after auto-commit and auto-push
+- Runs even if auto-commit is off or no changes were committed in the iteration
+- Exit code 0 = proceed to next iteration; non-zero = HARD STOP
+- After `/hands-free resume`, the loop continues to the next iteration without re-running the hook
+- New row added to Available Persistent Settings table
+
 ## [2.50.0] — 2026-03-19
 
 ### Added

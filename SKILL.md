@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.50.0
+version: 2.51.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4667,6 +4667,24 @@ When `Loop pre-iteration hook: <cmd>` is set in CLAUDE.md, hands-free runs the s
 
 **Default:** absent — no pre-iteration hook is run.
 
+### Loop Post-Iteration Hook
+
+When `Loop post-iteration hook: <cmd>` is set in CLAUDE.md, hands-free runs the specified shell command at the end of each iteration, after auto-commit and after auto-push (if `Loop auto-push: on`).
+
+**Timing:** Runs at the very end of the iteration — after auto-commit and after auto-push. If auto-commit is off or no changes were committed this iteration, the hook still runs.
+
+**Exit code semantics:** Exit code 0 = proceed to the next iteration. Non-zero = HARD STOP:
+
+```
+[hands-free] HARD STOP — Post-iteration hook failed (exit N): <cmd>. Run /hands-free resume to continue to the next iteration.
+```
+
+**After `/hands-free resume`:** The loop continues to the next iteration. The hook is not re-run.
+
+**Scope:** The command is run with cwd-scope classification rules.
+
+**Default:** absent — no post-iteration hook is run.
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -5049,6 +5067,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop skip on no changes: warn` | `Loop skip on no changes: warn` | When set to `warn`, emits a visible notice (`[hands-free] Loop skip: no changes produced in this iteration`) instead of silently skipping auto-commit when an iteration produces no file changes; session log always captures the skip event regardless; suppressed when `Loop quiet mode: on`; absent by default (silent skip) |
 | `Loop branch guard: <branch>` | `Loop branch guard: feature/my-feature` | When set, checks the current git branch at the start of each iteration (via `git branch --show-current`); fires a HARD STOP if the branch does not match the specified value; detached HEAD causes the same HARD STOP with actual shown as `(detached HEAD)`; absent by default (no branch check) |
 | `Loop pre-iteration hook: <cmd>` | `Loop pre-iteration hook: ./scripts/check-env.sh` | When set, runs the specified shell command at the start of each iteration before any other work (including build health check); exit 0 = proceed, non-zero = HARD STOP; after `/hands-free resume` the iteration proceeds without re-running the hook; command follows cwd-scope rules; absent by default |
+| `Loop post-iteration hook: <cmd>` | `Loop post-iteration hook: ./scripts/notify.sh` | When set, runs the specified shell command at the end of each iteration after auto-commit and auto-push (if enabled); runs even if auto-commit is off or no changes were committed; exit 0 = proceed to next iteration, non-zero = HARD STOP; after `/hands-free resume` the loop continues to the next iteration without re-running the hook; command follows cwd-scope rules; absent by default |
 
 ### Command-Level Overrides
 
