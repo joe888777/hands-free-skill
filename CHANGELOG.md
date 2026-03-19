@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.27.0] — 2026-03-19
+
+### Added
+
+**Loop Quiet Mode**
+- `Loop quiet: on/off` CLAUDE.md directive — suppresses routine per-iteration output in long loop runs
+- Suppressed: iteration start banners, routine auto-accept announcements, routing decisions, review checkpoint skip messages, auto-rebase success
+- Always shown regardless: hard stops, warnings (branch guard, budget exceeded, stall detection, consecutive failure), auto-commit messages, completion promise, 10-iteration cadence summaries
+- Session log (`/hands-free log`) captures all events regardless of quiet mode
+- Default: `off` — all announcements appear as normal
+- New `### Loop Quiet Mode` sub-section in `## Ralph Loop Integration`
+- Directive added to Available Persistent Settings table
+
 ## [2.26.0] — 2026-03-19
 
 ### Added

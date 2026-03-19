@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.26.0
+version: 2.27.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4274,6 +4274,31 @@ The iteration does not proceed until the user resolves the conflict and resumes.
 
 **CLAUDE.md directive:** `Loop auto-rebase: on` (see Available Persistent Settings)
 
+### Loop Quiet Mode
+
+In long ralph-loop runs, routine per-iteration announcements accumulate quickly and can obscure important signals. `Loop quiet: on` suppresses this routine output while keeping security-relevant and actionable events visible.
+
+**Suppressed in quiet mode:**
+- Iteration start banner (`[hands-free] Iteration N/M — prior work: ...`)
+- Routine auto-accept announcements (`Going with [option] (recommended)`)
+- Skill routing decisions (`Routing to executing-plans — plan exists, no failures`)
+- Auto-rebase success messages
+- Review checkpoint skip messages
+
+**Always shown regardless of quiet mode:**
+- Hard stops (all categories)
+- Warnings: branch guard, iteration budget exceeded, stall detection, consecutive failure
+- Auto-commit messages (`[auto-commit] feat: ...`)
+- Completion promise output
+- The 10-iteration cadence summary (`[hands-free] Iterations 11-20: ...`)
+- Loop-pause, loop-skip, and loop-resume announcements
+
+**Session log:** All events are captured in the session log regardless of quiet mode. Use `/hands-free log` to review the full event history even when quiet mode is suppressing console output.
+
+**Default:** off — all announcements appear as normal.
+
+**CLAUDE.md directive:** `Loop quiet: on` (see Available Persistent Settings)
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -4633,6 +4658,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop branch guard: off` | `Loop branch guard: off` | Disables the loop branch guard entirely (no warning when running on protected branches) |
 | `Loop iteration budget: N` | `Loop iteration budget: 30` | Warns once per iteration when the iteration has run longer than N minutes; absent by default (no time tracking) |
 | `Loop auto-rebase: on/off` | `Loop auto-rebase: on` | When `on`, runs `git pull --rebase` at every iteration start before any work begins; conflict causes a HARD STOP; default: `off` |
+| `Loop quiet: on/off` | `Loop quiet: on` | When `on`, suppresses routine per-iteration announcements (start banners, auto-accept decisions); hard stops, warnings, auto-commits, and completion promise always shown; default: `off` |
 
 ### Command-Level Overrides
 
