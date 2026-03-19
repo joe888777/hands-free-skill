@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.25.0
+version: 2.26.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4256,6 +4256,24 @@ When `Loop iteration budget: N` is set in CLAUDE.md, hands-free tracks elapsed t
 
 **CLAUDE.md directive:** `Loop iteration budget: 30` — warns when any iteration exceeds 30 minutes (see Available Persistent Settings)
 
+### Loop Auto-Rebase
+
+When `Loop auto-rebase: on` is set in CLAUDE.md, hands-free runs `git pull --rebase` at the **start of each iteration** before any brainstorming, planning, or execution begins. This keeps the loop synchronized with upstream changes from other contributors.
+
+**Success path:** If the rebase completes cleanly, announce:
+`[hands-free] Auto-rebase: synced with upstream (N new commits applied)` — or `up to date` if there were no new upstream commits. The iteration then proceeds normally.
+
+**Conflict path:** If the rebase encounters conflicts, announce a HARD STOP:
+`[hands-free] HARD STOP — auto-rebase conflict detected. Resolve conflicts with git rebase --continue or git rebase --abort, then use /hands-free resume to restart the iteration.`
+
+The iteration does not proceed until the user resolves the conflict and resumes. After resuming, the iteration begins from the start (no partial state from before the failed rebase is carried forward).
+
+**Default:** off — no `git pull --rebase` is ever issued automatically unless `Loop auto-rebase: on` is present in CLAUDE.md.
+
+**Note:** Auto-rebase does not stash uncommitted changes before pulling. If the loop has unstaged changes at iteration start, `git pull --rebase` may fail with "cannot rebase: You have unstaged changes." In that case, the HARD STOP fires and the user must stash or commit before resuming. Use auto-commit to keep the working tree clean between iterations.
+
+**CLAUDE.md directive:** `Loop auto-rebase: on` (see Available Persistent Settings)
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -4614,6 +4632,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop protected branches: <list>` | `Loop protected branches: main,master,release` | Comma-separated list of branch names that trigger the loop branch guard warning; default: `main,master` |
 | `Loop branch guard: off` | `Loop branch guard: off` | Disables the loop branch guard entirely (no warning when running on protected branches) |
 | `Loop iteration budget: N` | `Loop iteration budget: 30` | Warns once per iteration when the iteration has run longer than N minutes; absent by default (no time tracking) |
+| `Loop auto-rebase: on/off` | `Loop auto-rebase: on` | When `on`, runs `git pull --rebase` at every iteration start before any work begins; conflict causes a HARD STOP; default: `off` |
 
 ### Command-Level Overrides
 

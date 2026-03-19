@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.26.0] — 2026-03-19
+
+### Added
+
+**Loop Auto-Rebase**
+- `Loop auto-rebase: on/off` CLAUDE.md directive — when `on`, runs `git pull --rebase` at the start of every iteration before any work begins
+- Success: announces `[hands-free] Auto-rebase: synced with upstream (N new commits applied)`
+- Conflict: issues a HARD STOP — `[hands-free] HARD STOP — auto-rebase conflict detected` and pauses for user resolution
+- Default: `off` (no automatic rebasing)
+- Note: does not stash uncommitted changes; if unstaged changes exist, the rebase may fail and trigger the HARD STOP
+- New `### Loop Auto-Rebase` sub-section in `## Ralph Loop Integration`
+- Directive added to Available Persistent Settings table
+
 ## [2.25.0] — 2026-03-19
 
 ### Added
