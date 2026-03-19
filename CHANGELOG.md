@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.47.0] — 2026-03-19
+
+### Added
+- `Loop iteration timeout: N` CLAUDE.md directive: fires a HARD STOP if a single iteration has been running for more than N minutes
+- Check is opportunistic — evaluated at natural pause points (before/after major tool calls, before auto-commit), not a background timer
+- After `/hands-free resume`, the current iteration is abandoned and the loop moves to the next iteration (timed-out iteration not retried)
+- New row added to Available Persistent Settings table
+
 ## [2.46.0] — 2026-03-19
 
 ### Added
