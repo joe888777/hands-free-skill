@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.35.0] — 2026-03-19
+
+### Added
+- `Loop on-failure: <command>` CLAUDE.md directive: runs a shell command after each iteration that ends with test failures
+- Hook fires once per failed iteration (may fire many times across a session, unlike on-complete which fires once)
+- Hook failure is announced but does not halt loop execution
+- Same cwd-scope and HARD STOP rules apply as all other shell commands
+- New row added to Available Persistent Settings table
+
 ## [2.34.0] — 2026-03-19
 
 ### Added
