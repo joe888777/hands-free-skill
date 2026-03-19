@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.21.0
+version: 2.22.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -16,6 +16,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | Auto-accept design, pause at execution | `/hands-free partial` |
 > | Maximum autonomy in sandbox/throwaway repo | `/hands-free crazy-workspace` |
 > | Temporarily pause without changing mode | `/hands-free pause` / `/hands-free resume` |
+> | Pause after current iteration completes | `/hands-free loop-pause` / `/hands-free loop-resume` |
 > | See what would be auto-accepted | `/hands-free dry-run` |
 > | Check current settings | `/hands-free status` |
 > | Show session decisions | `/hands-free log` |
@@ -52,6 +53,8 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free dry-run      # preview what hands-free would auto-accept right now
 /hands-free pause        # temporarily suspend auto-accept without changing mode
 /hands-free resume       # resume auto-accept after a pause
+/hands-free loop-pause   # pause after current iteration completes (boundary pause — loop mode only)
+/hands-free loop-resume  # resume the loop from next iteration after loop-pause
 /hands-free explain      # explain why the last auto-accept or hard-stop decision was made
 /hands-free recommend    # show recommended settings based on usage
 /hands-free reset        # clear all learned preferences (requires confirmation)
@@ -4196,6 +4199,21 @@ The completion promise is checked at the **start of each iteration**, before any
 **Time-based promises:** If the promise references a time (e.g., `meet-9pm-utc+8`, `deadline-passed`, `after-midnight`), check the actual system clock at the start of each iteration using `date -u` (UTC) or `TZ='Asia/Shanghai' date` (UTC+8). Only output the promise when the current time has reached or passed the target time. Do NOT estimate, approximate, or output early.
 
 **Promise evaluation is atomic:** Evaluate the promise ONCE at the start of the iteration, not repeatedly during work. If the promise becomes true mid-iteration, output it at the start of the NEXT iteration (unless the task itself reaches natural completion — then output it immediately at that completion point, not at iteration start).
+
+### Loop Pause and Resume Commands
+
+Two pause behaviors are available in loop mode:
+
+| Command | Behavior |
+|---|---|
+| `/hands-free pause` | **Immediate pause** — stops auto-accept at the next approval point, even mid-iteration. The current iteration's work halts at that approval point and waits. Same behavior as outside loop mode. |
+| `/hands-free loop-pause` | **Boundary pause** — lets the current iteration complete normally, then pauses before the next iteration begins. Announces: `[hands-free] Loop-pause armed — will pause after this iteration completes` |
+| `/hands-free loop-resume` | Clears the boundary-pause flag. The loop resumes from the next iteration. Announces: `[hands-free] Loop-pause cleared — resuming loop` |
+| `/hands-free resume` | Clears an immediate pause. The next approval point proceeds without asking. |
+
+`loop-pause` is the preferred option when you want to intervene between iterations (e.g., to manually fix a stubborn failure) without disrupting an in-progress batch of work. If `/hands-free loop-pause` is invoked outside loop-aware mode, announce: `[hands-free] loop-pause has no effect outside loop mode`.
+
+**Status display:** When loop-pause is armed, `/hands-free status` shows `Loop-pause: armed`. When not armed, the field is omitted.
 
 ### What Hands-Free Does NOT Do in Loop Mode
 

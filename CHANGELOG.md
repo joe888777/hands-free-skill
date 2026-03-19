@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.22.0] — 2026-03-19
+
+### Added
+
+**Loop Pause/Resume Commands**
+- `/hands-free loop-pause` — boundary pause: arms a flag so the loop pauses *after* the current iteration completes (not mid-iteration); announces `[hands-free] Loop-pause armed — will pause after this iteration completes`
+- `/hands-free loop-resume` — clears the boundary-pause flag; announces `[hands-free] Loop-pause cleared — resuming loop`
+- New `### Loop Pause and Resume Commands` sub-section in `## Ralph Loop Integration` documenting boundary pause vs. immediate pause distinctions
+- Quick Reference table updated with loop-pause/loop-resume entries
+- Commands block updated with loop-pause and loop-resume entries
+- `/hands-free status` shows `Loop-pause: armed` when the flag is set
+
+---
+
 ## [2.21.0] — 2026-03-19
 
 ### Added
