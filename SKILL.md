@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.32.0
+version: 2.33.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4373,6 +4373,18 @@ The check runs **only at iteration boundaries** — in-progress iterations are n
 
 **Default:** absent — no wall-clock limit. Unlike the per-iteration time budget (which warns when a single iteration runs too long), max duration guards the total loop run time.
 
+### Loop On-Complete Hook
+
+When `Loop on-complete: <command>` is set in CLAUDE.md, hands-free runs the specified shell command **once** immediately before outputting the completion promise. The hook fires only when the promise condition is genuinely met for the first time.
+
+Announce before running: `[hands-free] On-complete hook: running '<command>'`
+
+The same cwd-scope auto-pass rules and HARD STOP rules that apply to all shell commands apply here. If the command fails (non-zero exit code), hands-free announces the failure but still outputs the completion promise — the hook is advisory and does not gate promise delivery: `[hands-free] On-complete hook failed: <error>. Continuing to output promise.`
+
+The hook fires exactly once per loop session. If the loop is paused and resumed, and the promise is already met, the hook does NOT fire again.
+
+**Default:** absent — no on-complete hook.
+
 ### What Hands-Free Does NOT Do in Loop Mode
 
 - Does NOT auto-accept `git push` in `full`/`partial`/`off` modes — still a hard stop (crazy-workspace: auto within `./`)
@@ -4738,6 +4750,7 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Loop auto-push: on/off` | `Loop auto-push: on` | When `on` (and `Auto-commit: on`), runs `git push` after each iteration's commits complete; skipped on loop-skip, HARD STOP, no new commits, or push failure; default: `off` |
 | `Loop checkpoint tags: on/off` | `Loop checkpoint tags: on` | When `on`, creates a lightweight git tag `loop-iter-N` after each iteration's commits; tags are not auto-pushed; no tag created if no new commits; default: `off` |
 | `Loop max duration: N` | `Loop max duration: 120` | Fires a HARD STOP at the start of an iteration when the total loop session has run for N minutes; checked at iteration boundaries only (no mid-iteration interruption); absent by default |
+| `Loop on-complete: <command>` | `Loop on-complete: ./notify.sh` | Runs the specified shell command once before outputting the completion promise; failure is announced but does not suppress the promise; same shell rules apply; absent by default |
 
 ### Command-Level Overrides
 

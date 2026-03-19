@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.33.0] — 2026-03-19
+
+### Added
+- `Loop on-complete: <command>` CLAUDE.md directive: runs a shell command once before the completion promise is output
+- Hook failure is announced but does not suppress promise delivery
+- Same cwd-scope and HARD STOP rules apply as all other shell commands
+- New row added to Available Persistent Settings table
+
 ## [2.32.0] — 2026-03-19
 
 ### Added
