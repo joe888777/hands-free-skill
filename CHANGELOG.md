@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.0] — 2026-03-19
+
+### Added
+- `Loop cooldown: N` CLAUDE.md directive: enforces a minimum N-second pause between the end of one iteration and the start of the next
+- If the iteration itself took longer than N seconds, no artificial delay is added
+- Cooldown applies only to automatic iteration flow, not after manual resume from a pause/HARD STOP
+- New row added to Available Persistent Settings table
+
 ## [2.36.0] — 2026-03-19
 
 ### Added
