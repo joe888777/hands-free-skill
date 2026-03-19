@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.8.0] — 2026-03-19
+
+### Added
+
+**Iteration Context Checkpoint**
+- `### Iteration Context Checkpoint`: loop writes `.claude/iteration-checkpoint.json` after each auto-commit, recording iteration number, last commit SHA + message, completed stories, pending stories, test summary, security grade, and active plan file
+- Checkpoint is auto-gitignored; format defined with field definitions table and JSON schema example
+- `### Loop-Aware Behavior` updated: reads checkpoint at iteration start; stale-SHA guard (SHA not in `git log --oneline -50` → skip); malformed-JSON fallback
+- Enhanced iteration announcement: when checkpoint is fresh, prints rich context block (last commit, stories done/pending, test counts, security grade) instead of one-liner
+- No re-brainstorming with fresh checkpoint: when `pending_stories` is non-empty, route directly to executing-plans; skip brainstorming and writing-plans phases
+- `/hands-free context`: new read-only command prints the checkpoint summary on demand; four output states (fresh / missing / stale / malformed)
+- `/hands-free context` added to Commands block and Quick Reference table
+
 ## [2.7.0] — 2026-03-19
 
 ### Added

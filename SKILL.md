@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.7.0
+version: 2.8.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -28,6 +28,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | View vulnerability summary | `/hands-free security` |
 > | Auto-remediate vulnerabilities on demand | `/hands-free security fix` |
 > | Check workspace health (git, build, tests, security) | `/hands-free health` |
+> | Print iteration checkpoint summary (read-only) | `/hands-free context` |
 >
 > **Always blocked (all modes):** `curl|bash`, `source <(curl)`, language RCE (`python -c exec`, `node -e eval`, `deno run <url>`), `chmod 777`, secrets in commits, `rm -rf *`, `rm -rf .git`
 
@@ -58,6 +59,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free security --scan  # force a fresh security scan immediately
 /hands-free security fix  # on-demand remediation: auto-fix medium/low, emit fix cmds for high/critical
 /hands-free health       # workspace health report (git state, build, tests, security posture)
+/hands-free context      # print iteration checkpoint summary (read-only)
 ```
 
 **Mode persistence:** Hands-free mode is **session-scoped** — it resets at the start of each new conversation. For consistent defaults, add to the project's CLAUDE.md:
@@ -2979,6 +2981,48 @@ Hands-Free Workspace Health
 
 `/hands-free health` is read-only — it does not auto-heal or modify any state. It is a diagnostic command only. Auto-healing occurs automatically in loop mode via pre-flight checks (see [Pre-flight Check](#pre-flight-check)).
 
+## `/hands-free context`
+
+When invoked, print the current iteration checkpoint summary from `.claude/iteration-checkpoint.json`. Read-only — no state changes.
+
+**Output when checkpoint exists and is fresh:**
+```
+Hands-Free Context — Iteration Checkpoint
+  iteration    : 4
+  last commit  : c3f35a4 — feat: add security remediation automation (v2.7.0)
+  stories done : US-001, US-002, US-003, US-004, US-005
+  pending      : (none)
+  tests        : 12 passed / 0 failed (2026-03-19T13:42:00Z)
+  security     : A
+  written at   : 2026-03-19T13:44:00Z
+```
+
+**Output when checkpoint is missing:**
+```
+Hands-Free Context — no checkpoint found
+  Run at least one loop iteration with auto-commit on to generate a checkpoint.
+```
+
+**Output when checkpoint is stale (SHA not in git log):**
+```
+Hands-Free Context — checkpoint stale
+  last_commit_sha c3f35a4 not found in recent git history.
+  The checkpoint may be from a different branch or squashed history.
+  Checkpoint data:
+    iteration    : 4
+    written at   : 2026-03-19T13:44:00Z
+  Use with caution — data may not reflect current branch state.
+```
+
+**Output when checkpoint is malformed:**
+```
+Hands-Free Context — checkpoint unreadable
+  .claude/iteration-checkpoint.json exists but could not be parsed.
+  Delete the file and run a new iteration to regenerate.
+```
+
+`/hands-free context` is safe to call at any time, inside or outside a loop. It is a diagnostic read of the checkpoint file only.
+
 ## `/hands-free dry-run`
 
 When invoked, simulate what the current mode + learning settings would auto-accept **without actually enabling hands-free or changing any state**. Read-only — no side effects.
@@ -3736,16 +3780,39 @@ Check for `.claude/.ralph-loop.local.md` at the start of each iteration. If pres
 
 ### Loop-Aware Behavior
 
-**Announce iteration start.** At the beginning of each iteration, print a brief one-line status:
-```
-[hands-free] Iteration 3/100 — prior work: 5 commits, tests: 8 passing / 2 failing, security: A
-[hands-free] Iteration 1/15 — no prior commits
-```
-Security grade is included in the iteration announcement if `.claude/security-posture.json` exists. If no scan has run yet, the security field is omitted from the announcement.
+**Read checkpoint at iteration start.** Before announcing iteration status, attempt to read `.claude/iteration-checkpoint.json`. Apply these rules in order:
 
-For time-based promises, include remaining time:
+1. **File missing** — no prior checkpoint; treat as first iteration. Proceed without checkpoint context.
+2. **File present, malformed JSON** — announce `[hands-free] Checkpoint unreadable — proceeding without prior context` and continue without it.
+3. **File present, valid JSON, stale SHA** — if `last_commit_sha` is not found in `git log --oneline -50`, announce `[hands-free] Checkpoint stale (SHA not in recent history) — skipping checkpoint` and proceed without it.
+4. **File present, valid JSON, fresh SHA** — load checkpoint and include the rich context block in the iteration announcement (see format below).
+
+**Announce iteration start.** At the beginning of each iteration, print the context block. Format depends on whether a valid checkpoint was loaded:
+
+*Without checkpoint (first iteration or stale/missing):*
 ```
-[hands-free] Iteration 7 — time remaining until promise: ~2h 14m
+[hands-free] Iteration 1/100 — no prior checkpoint
+```
+
+*With checkpoint (fresh SHA, valid data):*
+```
+[hands-free] Iteration 4/100 — context from checkpoint
+  last commit : c3f35a4 — feat: add security remediation automation (v2.7.0)
+  stories done: US-001, US-002, US-003, US-004, US-005
+  pending     : (none)
+  tests       : 12 passed / 0 failed (2026-03-19T13:42:00Z)
+  security    : A
+```
+
+Security grade is included only if `.claude/security-posture.json` exists; omit if no scan has run. The `pending` line lists incomplete stories from `active_plan_file`; show `(none)` when all are done or no plan exists.
+
+**No re-brainstorming with a fresh checkpoint.** When a valid checkpoint is loaded and `pending_stories` is non-empty, skip brainstorming and writing-plans phases — the design is already decided. Route directly to executing-plans for the next pending story. When `pending_stories` is empty and all verification passes, route to finishing-a-development-branch.
+
+For time-based promises, append remaining time after the context block:
+```
+[hands-free] Iteration 7/1000 — context from checkpoint
+  ...
+  time remaining: ~2h 14m until promise
 ```
 
 **Pre-flight check.** Before the build state health check, verify the workspace is in a state where git operations can succeed. Run these checks in order at the start of every loop iteration:
@@ -3971,6 +4038,52 @@ A stall is defined as any of:
 - The same error message or exception type appearing in the last 3 iterations without a different fix being attempted
 
 **Partial progress is NOT a stall:** If each iteration fixes at least one previously-failing test (even if new failures appear), it's not a stall — progress is being made. The stall warning fires only when ZERO improvement is detectable across 3 consecutive iterations.
+
+### Iteration Context Checkpoint
+
+At the **end of every loop iteration** (after auto-commit completes), hands-free writes `.claude/iteration-checkpoint.json`. At the **start of the next iteration**, this file is read to produce a rich context block in the announcement — eliminating the need to re-brainstorm previously approved designs.
+
+**When to write:** After the final auto-commit of the iteration (so `last_commit_sha` reflects committed work). Overwrite the file on each iteration — only the most recent checkpoint is retained.
+
+**File location:** `.claude/iteration-checkpoint.json` — auto-added to `.gitignore` on first write. This is session state, not source code.
+
+**JSON schema:**
+
+```json
+{
+  "iteration": 4,
+  "last_commit_sha": "c3f35a4",
+  "last_commit_message": "feat: add security remediation automation (v2.7.0)",
+  "completed_stories": ["US-001", "US-002", "US-003", "US-004", "US-005"],
+  "pending_stories": [],
+  "test_summary": {
+    "passed": 12,
+    "failed": 0,
+    "last_run": "2026-03-19T13:42:00Z"
+  },
+  "security_grade": "A",
+  "active_plan_file": null,
+  "written_at": "2026-03-19T13:44:00Z"
+}
+```
+
+**Field definitions:**
+
+| Field | Type | Description |
+|---|---|---|
+| `iteration` | int | The iteration number just completed |
+| `last_commit_sha` | string | Short SHA of the last auto-commit in this iteration |
+| `last_commit_message` | string | Full commit message of the last auto-commit |
+| `completed_stories` | string[] | Story IDs or bead titles completed this iteration |
+| `pending_stories` | string[] | Stories from the active plan not yet completed (empty if no plan file) |
+| `test_summary` | object | `passed`, `failed` counts and `last_run` ISO timestamp |
+| `security_grade` | string \| null | Grade from `.claude/security-posture.json`; null if no scan ran |
+| `active_plan_file` | string \| null | Path to PLAN.md or `.claude/plan.md` if it exists; null otherwise |
+| `written_at` | string | ISO 8601 timestamp when checkpoint was written |
+
+**`pending_stories` derivation:** Read the active plan file (PLAN.md or `.claude/plan.md`) and extract unchecked story items (`- [ ]` lines). If no plan file exists, use an empty array.
+
+**If no auto-commit occurred** (iteration produced no code changes): write the checkpoint anyway with `last_commit_sha` and `last_commit_message` from the most recent `git log` entry, and empty `completed_stories`.
 
 ## Crazy-Workspace Mode
 
