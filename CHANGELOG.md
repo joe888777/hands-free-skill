@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.15.0] — 2026-03-19
+
+### Added
+
+**Loop Auto-Stop Conditions**
+- Health floor auto-stop: if `health_score < 25` (configurable via `Loop health floor: N` in CLAUDE.md) for 3 consecutive iterations, hands-free announces `[hands-free] LOOP AUTO-STOP: Health floor breached (score: N for 3 iterations). Pausing for user review.` and halts the current iteration
+- Zero-progress auto-stop: if all 5 entries of `velocity_trend` are `0`, hands-free announces `[hands-free] LOOP AUTO-STOP: No story progress in last 5 iterations. Pausing for user review.` and halts the current iteration
+- Halting an iteration stops work, omits the completion promise, and logs `[auto-stop] <condition> — iteration N halted` in the session log; ralph-loop itself is NOT terminated
+- CLAUDE.md overrides: `- Loop auto-stop: off` disables both conditions; `- Loop health floor: N` sets a custom health floor threshold (default: 25)
+- Both overrides added to the "Available Persistent Settings" table in `## CLAUDE.md Override Reference`
+
 ## [2.14.0] — 2026-03-19
 
 ### Added

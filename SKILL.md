@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.14.0
+version: 2.15.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -4327,6 +4327,27 @@ The trend arrow is appended to the `health` line in the iteration announcement: 
 ```
 This warning is informational only — it does not pause or block the loop.
 
+### Loop Auto-Stop Conditions
+
+Hands-free monitors two conditions each iteration and halts work (without terminating ralph-loop) when either fires. Auto-stop runs at the **start of each iteration**, before any work begins. Consecutive-low-health tracking is held in session memory only (not persisted to the checkpoint).
+
+**Default thresholds (configurable via CLAUDE.md):**
+- Health floor: `health_score < 25` — default threshold: 25; consecutive count: 3
+- Zero-progress window: `velocity_trend` — all 5 entries must be `0`
+
+| Condition | Trigger | Announcement |
+|---|---|---|
+| Health Floor | `health_score < 25` for 3 consecutive iterations | `[hands-free] LOOP AUTO-STOP: Health floor breached (score: N for 3 iterations). Pausing for user review.` |
+| Zero-Progress | All 5 entries of `velocity_trend` are `0` | `[hands-free] LOOP AUTO-STOP: No story progress in last 5 iterations. Pausing for user review.` |
+
+**Halt behavior:** When either condition fires, hands-free:
+1. Announces the auto-stop message (above)
+2. Stops all work for this iteration — does not output the completion promise
+3. Logs the reason in the session log: `[auto-stop] <condition> — iteration N halted`
+4. Waits for the user to type "continue" before the next iteration resumes
+
+**ralph-loop is NOT terminated** — the loop itself continues to the next iteration once the user resumes. Only the current iteration's work is halted.
+
 ### PR Auto-Description
 
 When the `finishing-a-development-branch` phase starts in loop mode, hands-free auto-generates a PR title and body using checkpoint data. Output is announced as a fenced code block the user can copy directly into `gh pr create --title "..." --body "..."`.
@@ -4480,6 +4501,8 @@ Hands-free reads CLAUDE.md at the start of each session. Use a `# hands-free ove
 | `Review checkpoints: on/off` | `Review checkpoints: on` | Enables review checkpoints at session start |
 | `Default loop-aware: on` | `Default loop-aware: on` | Always enter loop-aware mode even without ralph-loop |
 | `Security block-on: <level>` | `block-on: high` | Sets when security findings block auto-commit (critical/high/none) |
+| `Loop auto-stop: off` | `Loop auto-stop: off` | Disables both health floor and zero-progress auto-stop conditions entirely |
+| `Loop health floor: N` | `Loop health floor: 15` | Overrides the default health floor threshold (default: 25) |
 
 ### Command-Level Overrides
 
