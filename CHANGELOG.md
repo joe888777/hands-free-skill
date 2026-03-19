@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.30.0] — 2026-03-19
+
+### Added
+- `Loop auto-push: on/off` CLAUDE.md directive: automatically pushes to origin after each iteration's auto-commits when enabled
+- Requires `Auto-commit: on` to have effect; silently disabled otherwise
+- Push skipped on loop-skip, HARD STOP, no new commits, or push failure (non-halting error)
+- New row added to Available Persistent Settings table
+
 ## [2.29.0] — 2026-03-19
 
 ### Added
