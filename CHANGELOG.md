@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.46.0] — 2026-03-19
+
+### Added
+- `Loop max changes: N` CLAUDE.md directive: fires a HARD STOP if the number of files changed in a single iteration exceeds N
+- File count via `git status --short` line count — includes staged, unstaged, and new untracked files; excludes `.gitignore`d files
+- Check runs after all edits complete, before auto-commit
+- After `/hands-free resume`, the iteration proceeds to auto-commit despite the excess; limit not re-checked for the same iteration
+- New row added to Available Persistent Settings table
+
 ## [2.45.0] — 2026-03-19
 
 ### Added
