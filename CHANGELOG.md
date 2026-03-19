@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.31.0] — 2026-03-19
+
+### Added
+- `Loop checkpoint tags: on/off` CLAUDE.md directive: creates lightweight git tag `loop-iter-N` after each iteration's commits
+- Tags created after auto-commits, before auto-push; not pushed automatically
+- No tag created if the iteration produced no new commits
+- New row added to Available Persistent Settings table
+
 ## [2.30.0] — 2026-03-19
 
 ### Added
