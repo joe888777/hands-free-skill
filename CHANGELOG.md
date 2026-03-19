@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.43.0] — 2026-03-19
+
+### Added
+- `Loop abort on regression: on/off` CLAUDE.md directive: fires a HARD STOP when failing test count increases between iterations
+- Comparison is skipped on the first iteration (no prior baseline)
+- Baseline resets after user runs `/hands-free resume`, preventing repeated HARD STOPs for the same regression
+- Compatible with `Loop max failures` — both directives can be active simultaneously
+- New row added to Available Persistent Settings table
+
 ## [2.42.0] — 2026-03-19
 
 ### Added
