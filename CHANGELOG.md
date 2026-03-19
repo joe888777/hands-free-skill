@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.29.0] — 2026-03-19
+
+### Added
+- `Loop notes: on/off` CLAUDE.md directive: appends a per-iteration summary to `.claude/loop-notes.md` when enabled
+- Entry captures iteration number, timestamp, status, files changed, test outcome, warnings, and duration
+- Notes file is not auto-committed (session artifact); recommend adding to `.gitignore`
+- New row added to Available Persistent Settings table
+
 ## [2.28.0] — 2026-03-19
 
 ### Added
