@@ -1,6 +1,6 @@
 ---
 name: hands-free
-version: 2.5.0
+version: 2.6.0
 description: Use when the user invokes /hands-free to enable auto-accept mode for skill recommendations. Hands-off workflow that auto-proceeds with recommended options. Supports full/partial/crazy-workspace/off modes, review checkpoints, auto-commit, pause/resume, learning with preference persistence, and ralph-loop integration. Security hard stops for pipe-to-shell, language-level RCE (deno run URL, perl), privilege escalation, global installs, secrets detection, prompt injection prevention, pipe/process-substitution/shell-variable classification, shell script content scanning, and new security patterns (eval $REMOTE, LD_PRELOAD, socat EXEC:bash, data exfiltration). Shell classification meta-rules: --dry-run/--check escalates ask→auto; --force escalates auto→ask; --insecure/--global/--system escalates to ask; --version/--help always auto. Comprehensive 500+ command patterns covering uv/poetry/pipenv/conda, Rust (nextest/cross/miri), TypeScript (tsup/vite/esbuild/biome), Docker/Podman/nerdctl, Redis, SQL DDL, kubectl, AWS/GCP/Azure CLIs, GitHub/GitLab CLIs, Playwright MCP, monorepo tools (Turborepo/Nx/Lerna/Rush), IaC (Terraform/Pulumi/CDK/Ansible), SaaS CLIs (Stripe/Supabase/Firebase/Vercel/Netlify/Fly.io/Railway), DB migrations (Flyway/Liquibase/Alembic/EF Core), Rails/Django/Phoenix/dotnet framework CLIs, Ruby testing (RSpec/RuboCop), Python testing (tox/nox/pytest), security scanners (trivy/grype/bandit/gosec/semgrep/pip-audit/safety/dependency-check), ML tools (DVC/MLflow/wandb), C/C++/LLVM/Erlang/Zig/Haskell/Scala/Clojure/Dart/Swift/Kotlin, gRPC (grpcurl/buf/rover), API codegen (openapi-generator/swagger-codegen), modern crypto (age/sops), network capture (tcpdump/tshark), k8s quality (kube-score/kubeval/kubesec/kyverno/pluto), service mesh (istioctl/linkerd), coverage (lcov/nyc/c8), observability (vector/otelcol/promtool), terminal multiplexers (tmux/screen/zellij), command runners (just/task), and 400+ more. Security automation toolkit: auto-runs cargo-audit/bandit/npm-audit/pip-audit/semgrep before every auto-commit; blocks on critical vulnerabilities; posture grade (A–F) in /hands-free status and loop commit messages; CLAUDE.md per-project overrides (block-on/skip-scanners/allow-patterns). Commands: /hands-free check (preview classification), /hands-free security (vulnerability summary; --scan forces immediate rescan), /hands-free recommend prune (prune stale prefs), /hands-free log --full (complete event log), /hands-free recommend promote (promote hard stop to auto).
 ---
 
@@ -26,6 +26,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 > | Pause before phase transitions | `/hands-free review-checkpoints on` |
 > | Preview how a command would be classified | `/hands-free check <command>` |
 > | View vulnerability summary | `/hands-free security` |
+> | Check workspace health (git, build, tests, security) | `/hands-free health` |
 >
 > **Always blocked (all modes):** `curl|bash`, `source <(curl)`, language RCE (`python -c exec`, `node -e eval`, `deno run <url>`), `chmod 777`, secrets in commits, `rm -rf *`, `rm -rf .git`
 
@@ -54,6 +55,7 @@ Auto-accept recommended options from any skill without pausing. Works with super
 /hands-free check <cmd>  # would this command auto-pass? Shows classification without running it
 /hands-free security     # show vulnerability summary from last security scan
 /hands-free security --scan  # force a fresh security scan immediately
+/hands-free health       # workspace health report (git state, build, tests, security posture)
 ```
 
 **Mode persistence:** Hands-free mode is **session-scoped** — it resets at the start of each new conversation. For consistent defaults, add to the project's CLAUDE.md:
@@ -2926,6 +2928,55 @@ The `Security:` line is shown in all modes (including off) when `.claude/securit
 
 In `off` mode, learning continues tracking choices but no auto-accept or auto-commit happens. Preferences accumulate for when the mode is re-enabled.
 
+## `/hands-free health`
+
+When invoked, print a four-section workspace health report and an overall verdict. Works in all modes including `off`. Produces output even when individual tools are not available (shows `unknown` rather than erroring).
+
+```
+Hands-Free Workspace Health
+  Git State:
+    Branch:       main (up to date with origin)
+    Working tree: clean
+    Ahead/behind: 0/0
+    Conflicts:    none
+    HEAD:         attached
+
+  Build State:
+    Project type: Rust (Cargo.toml detected)
+    Last build:   pass
+
+  Test State:
+    Last run:     pass (47 tests, 0 failures)
+
+  Security Posture:
+    Grade:        A (0 critical, 1 high) — last scan: 12 min ago
+
+  Overall: HEALTHY
+```
+
+**Verdict levels:**
+
+| Verdict | Meaning |
+|---|---|
+| `HEALTHY` | All sections report pass/clean/no-conflicts; no action needed |
+| `DEGRADED` | One or more issues present but auto-healable (e.g., stashable changes, minor build warnings) |
+| `BLOCKED` | Issues present that require manual intervention before work can continue (merge conflicts, detached HEAD, failed build) |
+
+**When a section cannot be determined** (git not available, no test runner, no prior build), that section reports `unknown` and does not affect the verdict. The report always completes — it never errors out.
+
+**`DEGRADED` examples:**
+- Working tree has unstaged changes (will be auto-stashed before next pull)
+- Security grade is C or D (non-blocking warning)
+- Last build passed but with warnings
+
+**`BLOCKED` examples:**
+- Merge conflicts in working tree
+- Detached HEAD state
+- Last build failed with errors
+- No commits in last 3 iterations (loop stall detected)
+
+`/hands-free health` is read-only — it does not auto-heal or modify any state. It is a diagnostic command only. Auto-healing occurs automatically in loop mode via pre-flight checks (see [Pre-flight Check](#pre-flight-check)).
+
 ## `/hands-free dry-run`
 
 When invoked, simulate what the current mode + learning settings would auto-accept **without actually enabling hands-free or changing any state**. Read-only — no side effects.
@@ -3545,6 +3596,21 @@ For time-based promises, include remaining time:
 [hands-free] Iteration 7 — time remaining until promise: ~2h 14m
 ```
 
+**Pre-flight check.** Before the build state health check, verify the workspace is in a state where git operations can succeed. Run these checks in order at the start of every loop iteration:
+
+| # | Condition | State | Action | Announce |
+|---|---|---|---|---|
+| 1 | `git status` shows both-modified (merge conflict markers) | BLOCKED | Halt iteration | `[hands-free] Pre-flight BLOCKED — merge conflicts present. Resolve manually before continuing.` |
+| 2 | HEAD is detached (`git symbolic-ref HEAD` fails) | BLOCKED | Halt iteration | `[hands-free] Pre-flight BLOCKED — detached HEAD. Run git checkout <branch> before continuing.` |
+| 3 | Staged but uncommitted changes exist | DEGRADED | Auto-commit staged files with message `chore: pre-flight auto-commit [ralph #N]` (or warn if secrets detected) | `[hands-free] Pre-flight: auto-committed N staged file(s) to allow rebase` |
+| 4 | Unstaged modifications to tracked files | DEGRADED | Auto-stash (see Auto-Stash Pattern) | `[hands-free] Pre-flight: auto-stashed N file(s) before pull` |
+
+**BLOCKED** means the iteration cannot safely continue. Hands-free announces the block and stops work for this iteration. Ralph-loop moves to the next iteration (ralph-loop controls termination — do not output the completion promise as a result of a block).
+
+**DEGRADED** means an issue was detected and auto-healed. Hands-free announces what was fixed, then continues to the build state health check.
+
+If the working tree is already clean (no staged changes, no unstaged modifications, no conflicts, HEAD attached) — pre-flight passes silently with no announcement.
+
 **Build state health check.** Before routing to any superpowers skill, check if the project compiles/builds. Detect the project type from root-level config files:
 - **Rust** (`Cargo.toml`): run `cargo build` — if it fails with errors → systematic-debugging
 - **Python** (`pyproject.toml` / `setup.py` / `requirements.txt`): run `python -m py_compile $(find . -name "*.py" -not -path "./.venv/*")` or check with mypy — if errors → systematic-debugging
@@ -3658,6 +3724,52 @@ When loop-aware, monitor iteration count against `max_iterations` from `.claude/
 | 0 remaining | Ralph-loop controls termination — do not override |
 
 The "1 remaining" pause is the only mandatory pause the warning system introduces. It surfaces before ralph-loop hard-terminates, giving the user a chance to intervene.
+
+### Auto-Stash Pattern
+
+When a loop iteration needs to pull from origin but the working tree has unstaged modifications to tracked files, hands-free uses an auto-stash/unstash cycle to keep `git pull --rebase` from failing.
+
+**When auto-stash runs:**
+- Pre-flight check detects unstaged changes to tracked files (condition 4 in the pre-flight table)
+- The branch is behind origin (determined from `git status -sb` showing `behind N` or `git fetch --dry-run` showing new commits)
+- Working tree is NOT already clean (skip creating an empty stash)
+
+**Auto-stash algorithm:**
+
+```
+1. git stash push -m "hands-free pre-pull auto-stash [ralph #N]"
+   → announce: [hands-free] Auto-stashed N file(s) before pull — will restore after rebase
+
+2. git pull --rebase
+   → on failure: announce [hands-free] Pre-flight BLOCKED — pull --rebase failed. Auto-stash preserved as stash@{0}.
+                 set iteration state to BLOCKED; do not attempt stash pop
+
+3. git stash pop
+   → on success: announce [hands-free] Auto-stash restored (N file(s))
+   → on failure: announce [hands-free] Auto-stash pop failed — stash preserved as stash@{0}. Resolve conflicts manually.
+                 set iteration state to BLOCKED
+```
+
+**Safety rules:**
+- Auto-stash is NEVER created if working tree is clean (avoids empty stash entries)
+- Auto-stash is NEVER created for untracked files — only tracked, modified files are stashed
+- The stash message includes the iteration number for identifiability: `hands-free pre-pull auto-stash [ralph #N]`
+- If `git stash pop` fails (conflict between stash content and newly-pulled changes), the stash entry is preserved at `stash@{0}` and the iteration is set to BLOCKED — no further work proceeds
+- Auto-stash is idempotent: if pop succeeds, `git stash list` shows no new entries; if pop fails, exactly one entry `stash@{0}` remains
+
+**When auto-stash is NOT needed:**
+- Working tree is already clean → skip silently
+- Branch is not behind origin (`git status -sb` shows no `behind N`) → no pull needed → skip
+- Pre-flight detected merge conflicts or detached HEAD (conditions 1–2) → iteration is already BLOCKED; do not stash
+
+**Announce format summary:**
+
+| Event | Announce |
+|---|---|
+| Stash created | `[hands-free] Auto-stashed N file(s) before pull — will restore after rebase` |
+| Stash restored successfully | `[hands-free] Auto-stash restored (N file(s))` |
+| Pull failed (stash preserved) | `[hands-free] Pre-flight BLOCKED — pull --rebase failed. Auto-stash preserved as stash@{0}.` |
+| Stash pop failed (conflict) | `[hands-free] Auto-stash pop failed — stash preserved as stash@{0}. Resolve conflicts manually.` |
 
 ### Completion Promise Evaluation
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.6.0] — 2026-03-19
+
+### Added
+
+**Workspace Health & Pre-flight Checks**
+- `/hands-free health` command: four-section report (Git State, Build State, Test State, Security Posture) with overall verdict: `HEALTHY` / `DEGRADED` / `BLOCKED`
+- Pre-flight check runs at the start of every loop iteration before build health check — detects merge conflicts, detached HEAD, staged uncommitted changes, and unstaged modifications
+- BLOCKED state: iteration halts with announcement when conflicts or detached HEAD are present; loop continues to next iteration
+- DEGRADED state: auto-heals staged changes (auto-commit) and unstaged modifications (auto-stash), announces fix, continues
+- Auto-stash/unstash pattern: automatically stashes tracked modified files before `git pull --rebase`, restores after; stash message includes iteration number for identifiability
+- If `git stash pop` fails (merge conflict with pulled changes), stash is preserved at `stash@{0}` and iteration is set to BLOCKED
+- `/hands-free health` is read-only — diagnostics only; auto-healing is loop pre-flight only
+- Pre-flight table documents all four conditions, actions, and announce messages
+
 ## [2.5.0] — 2026-03-19
 
 ### Added
